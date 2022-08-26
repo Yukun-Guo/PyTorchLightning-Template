@@ -1,0 +1,154 @@
+backbone_net: !!python/name:MyNetwrok.CNNNet ''
+batch_size: 8
+data_split_idx:
+- - 3
+  - 7
+  - 11
+  - 15
+  - 19
+  - 22
+  - 27
+  - 31
+  - 35
+  - 39
+  - 41
+  - 45
+  - 49
+- - 0
+  - 1
+  - 2
+  - 3
+  - 5
+  - 6
+  - 7
+  - 9
+  - 10
+  - 11
+  - 13
+  - 14
+  - 15
+  - 17
+  - 18
+  - 19
+  - 21
+  - 22
+  - 24
+  - 25
+  - 26
+  - 27
+  - 29
+  - 30
+  - 31
+  - 33
+  - 34
+  - 35
+  - 37
+  - 38
+  - 39
+  - 41
+  - 43
+  - 44
+  - 45
+  - 47
+  - 48
+  - 50
+  - 51
+  - 52
+  - 53
+  - 54
+  - 55
+  - 56
+  - 57
+  - 58
+  - 59
+  - 60
+  - 61
+  - 62
+  - 63
+  - 64
+  - 65
+  - 66
+  - 67
+  - 68
+  - 69
+  - 70
+file_list:
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_0161ac93249cbf48ab7d514d9b59774b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_05563d76e11f8a4caeff60194f1b38a5_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_06123804978d6d4d80b5e95e7247626d_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_075f1fdf93de614daceb421157f50c2e_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_0c7e320df19b5f4c9d693e53f77ae2e1_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_0df8ce4eea782140945d59ce847db44b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_145630a674c1f74b9235b6cd50f66db5_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_15434f7fa603d34caaf05e8d1edfb400_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_15b7e80928c4254bbb9ab610c8b201d6_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_15dba2a7907bfe4ea4713ce63969e899_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_17fd360fb5181244aa8f277380e151a1_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_1bfa42ad8b4b7442a6041da325730c7a_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_1c2876ee85aa0645af2ad81afc20ba7e_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_1e8ac7b65b0c934c840cc9503ee69699_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_27b3d203d74a20448db2bf5100f9f250_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_3b3202f02d52c04d848bbf4803cebbcc_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_3cbc81bae9eae64ca685da727e8cbd88_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_3fa4b528878f2a4daeb6e743d0e3e981_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_3fcd905aeeead641bd3553b3d613448c_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_41cfa276da90e74ba5c3049263eadf5b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_46f90de1d097184799326f5772919814_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_494dc009d6614d44bcae0d7910f258ea_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_4a02ed93aca94148827a8eb4d575f2b7_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_4acdaab47e7a954fb9a29a7ee1d29848_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_4af3b3f10a28e04393e20253445f75a3_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_4d7acd631b3b2c4a961a57f5e1bb79b1_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_515cc14003aab24b9d67a415ad190c31_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_521c01e41a659543bf3d7e21d02c6b2b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5456cc35541fee4e9c2ec19f094ce513_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_55700680becc6e49b35bbf53cea30f4a_M_FX.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5a5901bc6df2ce4dbf8acad002aa4e96_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5b0f744427a5c0478fdce8f61b72e308_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5ba058aacfea7a4489bdd205949a1d22_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5e7d4707cfefc64885fb12e187f5a134_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_5f83e141aca8c548b0514ba39e21d9e3_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_63520db11452a14ba3c4b63b5ba0b392_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_67c7da5a2a208848abf534e336334c7b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_6893a7df178fe8479a4df4dac01a4039_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_68bfb4e676061b4da284cef37ec9e3ee_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_698750d3d26ffd4d84dec1c9ae4d8554_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_7098b8634a5cda48b0e6d23eedcf7370_M_FX.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_72bee349ad8e314287201b60423495a8_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_745c971d669eef449fed4ce0fc932d60_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_75677c5192dc7845bb26f8eabdb28e1b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_7d405fb078cde3429f93a8f751c6e30f_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_7e36171a1df7b84885edb9f9afca85fe_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_835da9f6de486b499b7da85c317efdda_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_83955173d06c8e44ab2f1738de69ebff_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_8501348e2954ed44bb7ad57ccb2f5613_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_856bdc064bf0fb4da8ae62615d14d54d_M_FX.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_85a39c36f5f5c94396b0ff3efc40c474_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_87a05f008ccccc4e89b1775d32259e90_M_FX.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_8bae68ae26b006468448e7ae9d439a42_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_8e94403f671ed54da3bf5c89db7fe84e_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_91c39d3fe70f804a92d5897f2012e3c8_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_94d6e01791a27c4a9388a2a7e56bcc85_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_9c790149de951146b752e52303709525_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_a391f717ba4cc5419d9265053bf45e29_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_bf3fc72bb836af4abcd42a27757fbd3c_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_bff3f41328f7d04db817565b4b4231c5_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_d40434c05f7f1f4387ff6857476459fc_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_d4e6e0e8d0339342ba02c348dfe145e6_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_d556a32866fe6d4faa1af82e6db302d4_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_dbfd435f0f7c83469470da862cdd0eff_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_de9727ff1b7c634bbee1772ba56fcc59_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_e213bf8720222a429e696fa6f7752445_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_f09b58c2197ee54bb49b47f31f40da12_M_FX.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_f12775554a5c9544b0c5126e035c7b81_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_f7a43753ccdc1c4eabb5b7e8243f4e13_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_fee24f2367b2e34e8947d400722d7f8b_M_FX_Fulldata.mat
+- F:\Data4LayerSegmentation\_Dataset_v2_\COOL-ART_ff40bcd2c2216b42b258df14ed806c44_M_FX.mat
+img_chn: 1
+img_tag: imgMat
+input_size: !!python/tuple
+- 384
+- 288
+k_fold: 1
+log_dir: logs/
+msk_tag: imgMask
