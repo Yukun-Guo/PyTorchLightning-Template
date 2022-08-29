@@ -5,6 +5,7 @@ from pytorch_lightning.metrics import functional as FM
 from pytorch_lightning.callbacks import early_stopping, model_checkpoint, lr_monitor
 from pytorch_lightning.loggers import TensorBoardLogger
 import numpy as np
+from MyNetwrok import CNNNet
 from losses import dice, soft_bce, soft_ce
 from Utils.utils import apply_colormap
 from torchsummary import summary
@@ -150,7 +151,7 @@ class NetModel(ptl.LightningModule):
 
 
 if __name__ == '__main__':
-    from Backbone_NN import resnet50
-    model = SegModel(resnet50)
+
+    model = NetModel(CNNNet)
     model.summary()
     model.to_onnx('test.onnx')
