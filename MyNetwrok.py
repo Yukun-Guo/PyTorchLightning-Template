@@ -209,6 +209,9 @@ class CNNNet(nn.Module):
         x = self.out(x)
         return x
 
+    def __str__():
+        return 'CNNNet'
+
 
 if __name__ == '__main__':
     model = CNNNet(1, 3)

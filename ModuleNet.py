@@ -10,16 +10,14 @@ from Utils.utils import apply_colormap
 from torchsummary import summary
 from torch.utils.data import DataLoader
 from PreprocessData import myDataset_mat
-from ResizeRight import resize_right
+from Utils import resize_right
 
 
 class NetModel(ptl.LightningModule):
 
-    def __init__(self, backbone_net, file_list, data_split_idx, batch_size=8, input_size=(384, 288),
-                 img_chn=1, k_fold=1, log_dir='logs/', img_tag='imgMat', msk_tag='imgMask'):
+    def __init__(self, backbone_net, input_size=(384, 288), img_chn=1, log_dir='logs/', k_fold=0):
         super(NetModel, self).__init__()
-        self.img_tag = img_tag
-        self.msk_tag = msk_tag
+
         self.save_hyperparameters()
         self.input_size = input_size
         self.img_chn = img_chn
@@ -28,14 +26,11 @@ class NetModel(ptl.LightningModule):
             in_channels=1, out_channels=1, out_activation=None)
         self.out2 = backbone_net(
             in_channels=1, out_channels=12, out_activation=None)
-        self.model_name = 'myBackboneNet'
+        self.model_name = backbone_net.__str__()
         self.log_dir = log_dir
         self.valid_dataset = None
         self.train_dataset = None
         self.k_fold = k_fold
-        self.file_list = file_list
-        self.data_split_idx = data_split_idx
-        self.batch_size = batch_size
 
     def forward(self, x):
         x1 = self.out1(x)
@@ -55,19 +50,19 @@ class NetModel(ptl.LightningModule):
             dice.DiceLoss(mode='multiclass')(y_hat2_s, y2)
         train_loss = (loss1 + loss2) / 2
 
-        acc1 = FM.accuracy(y_hat1_s, y1)
-        acc2 = FM.accuracy(y_hat2_s, y2)
-        train_acc = (acc1 + acc2) / 2
+        # acc1 = FM.accuracy(y_hat1_s, y1.type(torch.int64))
+        # acc2 = FM.accuracy(y_hat2_s, y2)
+        # train_acc = (acc1 + acc2) / 2
 
-        iou1 = FM.iou(y_hat1_s, y1)
+        iou1 = FM.iou(y_hat1_s, y1.type(torch.int64))
         iou2 = FM.iou(y_hat2_s, y2)
         train_iou = (iou1 + iou2) / 2
 
         self.logger.experiment.add_scalars(
             "losses", {"train_loss": train_loss}, global_step=self.global_step)
-        metrices = {'acc': {'train_acc': train_acc},
-                    'iou': {'train_iou': train_iou}}
-        self.log_dict(metrices)
+        self.logger.experiment.add_scalars(
+            "iou", {'train_iou': train_iou}, global_step=self.global_step)
+
         return {'loss': train_loss}
 
     def validation_step(self, batch, batch_idx):
@@ -82,16 +77,19 @@ class NetModel(ptl.LightningModule):
             dice.DiceLoss(mode='multiclass')(y_hat2_s, y2)
         val_loss = (loss1 + loss2) / 2
 
-        acc1 = FM.accuracy(y_hat1_s, y1)
-        acc2 = FM.accuracy(y_hat2_s, y2)
-        val_acc = (acc1 + acc2) / 2
+        # acc1 = FM.accuracy(y_hat1_s, y1.type(torch.int64))
+        # acc2 = FM.accuracy(y_hat2_s, y2)
+        # val_acc = (acc1 + acc2) / 2
 
-        iou1 = FM.iou(y_hat1_s, y1)
+        iou1 = FM.iou(y_hat1_s, y1.type(torch.int64))
         iou2 = FM.iou(y_hat2_s, y2)
         val_iou = (iou1 + iou2) / 2
-        metrices = {'val_loss': val_loss, 'losses': {'val_loss': val_loss}, 'acc': {'val_acc': val_acc},
-                    'iou': {'val_iou': val_iou}}
-        self.log_dict(metrices)
+
+        self.logger.experiment.add_scalars(
+            "losses", {"val_loss": val_loss}, global_step=self.global_step)
+        self.logger.experiment.add_scalars(
+            'iou', {'val_iou': val_iou}, global_step=self.global_step)
+        self.log_dict({'val_loss': val_loss, 'val_iou': val_iou})
         # log images
 
         x = resize_right.resize(x, scale_factors=0.5)
@@ -115,25 +113,6 @@ class NetModel(ptl.LightningModule):
         self.logger.experiment.add_images(
             "gt2", y2_true, self.current_epoch, dataformats='NHWC')
         self.logger.experiment.flush()
-
-    def prepare_data(self):
-        train_list = [self.file_list[i] for i in self.data_split_idx[0]]
-        valid_list = [self.file_list[i] for i in self.data_split_idx[1]]
-        self.train_dataset = myDataset_mat(
-            train_list, self.input_size, img_tag=self.img_tag, msk_tag=self.msk_tag)
-        self.valid_dataset = myDataset_mat(
-            valid_list, self.input_size, img_tag=self.img_tag, msk_tag=self.msk_tag)
-        print(
-            f'Train on {len(self.train_dataset)} samples, validation on {len(self.valid_dataset)} samples.')
-
-    def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=self.batch_size, shuffle=False)
-
-    def test_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=self.batch_size, shuffle=False)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=0.002)  # 0

@@ -51,7 +51,7 @@ class myDataset_mat(Dataset):
         img = torch.from_numpy(np.expand_dims(img, 0))
 
         # mask 1: retinal tissue and FV, 0: background
-        msk1 = torch.from_numpy(np.clip(mask, 0, 1))
+        msk1 = torch.from_numpy(np.clip(mask, 0, 1)).type(torch.float32)
         msk2 = torch.from_numpy(mask)
         sample = {'img': img, 'mask1': msk1, 'mask2': msk2}
 
