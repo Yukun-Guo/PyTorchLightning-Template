@@ -4,11 +4,13 @@
 
 ```{bash}
 python -m venv /path/to/new/virtual/environment
+python -m ensurepip --upgrade
+python -m pip install --upgrade pip
 ```
 ## or create new env using conda
 
 ```{bash}
-conda create -n myenv python=3.xCancel changes
+conda create -n myenv python=3.x
 ```
 
 ## 2. install requirements.txt
