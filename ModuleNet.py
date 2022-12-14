@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as ptl
-from pytorch_lightning.metrics import functional as FM
+from torchmetrics import functional as FM
 from pytorch_lightning.callbacks import early_stopping, model_checkpoint, lr_monitor
 from pytorch_lightning.loggers import TensorBoardLogger
 import numpy as np
@@ -16,17 +16,24 @@ from Utils import resize_right
 
 class NetModel(ptl.LightningModule):
 
-    def __init__(self, backbone_net, input_size=(384, 288), img_chn=1, log_dir='logs/', k_fold=0):
+    def __init__(self,
+                 backbone_net,
+                 input_size=(384, 288),
+                 img_chn=1,
+                 log_dir='logs/',
+                 k_fold=0):
         super(NetModel, self).__init__()
 
         self.save_hyperparameters()
         self.input_size = input_size
         self.img_chn = img_chn
         self.example_input_array = torch.randn((1, img_chn, *input_size))
-        self.out1 = backbone_net(
-            in_channels=1, out_channels=1, out_activation=None)
-        self.out2 = backbone_net(
-            in_channels=1, out_channels=12, out_activation=None)
+        self.out1 = backbone_net(in_channels=1,
+                                 out_channels=1,
+                                 out_activation=None)
+        self.out2 = backbone_net(in_channels=1,
+                                 out_channels=12,
+                                 out_activation=None)
         self.model_name = backbone_net.__str__()
         self.log_dir = log_dir
         self.valid_dataset = None
@@ -59,10 +66,11 @@ class NetModel(ptl.LightningModule):
         iou2 = FM.iou(y_hat2_s, y2)
         train_iou = (iou1 + iou2) / 2
 
-        self.logger.experiment.add_scalars(
-            "losses", {"train_loss": train_loss}, global_step=self.global_step)
-        self.logger.experiment.add_scalars(
-            "iou", {'train_iou': train_iou}, global_step=self.global_step)
+        self.logger.experiment.add_scalars("losses",
+                                           {"train_loss": train_loss},
+                                           global_step=self.global_step)
+        self.logger.experiment.add_scalars("iou", {'train_iou': train_iou},
+                                           global_step=self.global_step)
 
         return {'loss': train_loss}
 
@@ -86,10 +94,10 @@ class NetModel(ptl.LightningModule):
         iou2 = FM.iou(y_hat2_s, y2)
         val_iou = (iou1 + iou2) / 2
 
-        self.logger.experiment.add_scalars(
-            "losses", {"val_loss": val_loss}, global_step=self.global_step)
-        self.logger.experiment.add_scalars(
-            'iou', {'val_iou': val_iou}, global_step=self.global_step)
+        self.logger.experiment.add_scalars("losses", {"val_loss": val_loss},
+                                           global_step=self.global_step)
+        self.logger.experiment.add_scalars('iou', {'val_iou': val_iou},
+                                           global_step=self.global_step)
         self.log_dict({'val_loss': val_loss, 'val_iou': val_iou})
         # log images
 
@@ -105,14 +113,22 @@ class NetModel(ptl.LightningModule):
         y2_true = apply_colormap(np.ceil(y2.cpu().numpy()).astype('int64'))
 
         self.logger.experiment.add_images("bscans", x, self.current_epoch)
-        self.logger.experiment.add_images(
-            "pred1", y1_log, self.current_epoch, dataformats='NHWC')
-        self.logger.experiment.add_images(
-            "gt1", y1_true, self.current_epoch, dataformats='NHWC')
-        self.logger.experiment.add_images(
-            "pred2", y2_log, self.current_epoch, dataformats='NHWC')
-        self.logger.experiment.add_images(
-            "gt2", y2_true, self.current_epoch, dataformats='NHWC')
+        self.logger.experiment.add_images("pred1",
+                                          y1_log,
+                                          self.current_epoch,
+                                          dataformats='NHWC')
+        self.logger.experiment.add_images("gt1",
+                                          y1_true,
+                                          self.current_epoch,
+                                          dataformats='NHWC')
+        self.logger.experiment.add_images("pred2",
+                                          y2_log,
+                                          self.current_epoch,
+                                          dataformats='NHWC')
+        self.logger.experiment.add_images("gt2",
+                                          y2_true,
+                                          self.current_epoch,
+                                          dataformats='NHWC')
         self.logger.experiment.flush()
 
     def configure_optimizers(self):
@@ -123,19 +139,28 @@ class NetModel(ptl.LightningModule):
             factor=0.1,
             patience=3,
             min_lr=1e-8,
-            verbose=True
-        )
-        lr_scheduler = {'scheduler': reduce_lr_on_plateau, 'monitor': 'val_loss',
-                        'interval': 'epoch', 'reduce_on_plateau': True}
+            verbose=True)
+        lr_scheduler = {
+            'scheduler': reduce_lr_on_plateau,
+            'monitor': 'val_loss',
+            'interval': 'epoch',
+            'reduce_on_plateau': True
+        }
         return [optimizer], [lr_scheduler]
 
     def configure_callbacks(self):
         fd = str(self.k_fold)
-        early_stop = early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=1e-08, patience=10)
+        early_stop = early_stopping.EarlyStopping(monitor="val_loss",
+                                                  min_delta=1e-08,
+                                                  patience=10)
 
-        checkpoint = model_checkpoint.ModelCheckpoint(dirpath=self.log_dir + self.model_name, monitor="val_loss",
-                                                      save_top_k=1, verbose=True, filename=f'{self.model_name}-fold={fd}' + '-{epoch:03d}-{val_loss:.5f}')
+        checkpoint = model_checkpoint.ModelCheckpoint(
+            dirpath=self.log_dir + self.model_name,
+            monitor="val_loss",
+            save_top_k=1,
+            verbose=True,
+            filename=f'{self.model_name}-fold={fd}' +
+            '-{epoch:03d}-{val_loss:.5f}')
 
         lr_monitors = lr_monitor.LearningRateMonitor(logging_interval='epoch')
         return [early_stop, checkpoint, lr_monitors]

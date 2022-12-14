@@ -10,8 +10,9 @@ import torch.nn.functional as F
 
 def read_mat_to_npy(filename):
     mat = sio.loadmat(filename)
-    img, mask = np.array(mat['imgMat'], dtype='float32'), np.array(
-        mat['maskMat'], dtype='int64')
+    img, mask = np.array(mat['imgMat'],
+                         dtype='float32'), np.array(mat['maskMat'],
+                                                    dtype='int64')
     npy_data = [(img[:, :, i], mask[:, :, i]) for i in range(img.shape[2])]
     print(f'reading {filename}')
     return npy_data
@@ -21,8 +22,8 @@ def k_fold_split(file_list, fold=5):
     kFold_list_file = []
     kFold_list_idx = []
     data_set_length = len(file_list)
-    idexs = np.tile(np.arange(0, fold), data_set_length //
-                    fold + 1)[:data_set_length]
+    idexs = np.tile(np.arange(0, fold),
+                    data_set_length // fold + 1)[:data_set_length]
     for i in range(fold):
         flg_valid = np.where(idexs == i)[0]
         flg_train = np.where(idexs != i)[0]
@@ -67,25 +68,26 @@ print(kFold_list_list[0][0])
 n_classes = 12
 for fn in files:
     mat = sio.loadmat(fn)
-    img, mask = np.array(mat['imgMat'], dtype='float32'), np.array(
-        mat['imgMask'], dtype='int64')
+    img, mask = np.array(mat['imgMat'],
+                         dtype='float32'), np.array(mat['imgMask'],
+                                                    dtype='int64')
     pred = np.zeros((n_classes, *img.shape)).astype('uint16')
     pred_int = np.zeros_like(img).astype('uint8')
     for i in range(img.shape[2]):
         # pre-pare data
-        im = pad_power2_size(img[:, :, i], downsample_level=4)/255.0
+        im = pad_power2_size(img[:, :, i], downsample_level=4) / 255.0
         im = np.expand_dims(np.expand_dims(im, 0), 0)
         # predict
         y = model(torch.tensor(im).cuda())[1].cpu()
         y = F.softmax(y, dim=1, _stacklevel=5)
         # post-pare data
         out_int = torch.squeeze(torch.argmax(y, dim=1)).numpy()
-        out_int = restore_size(out_int, img.shape[0:2]).astype('uint8')
+        out_int = restore_size(out_int, img.shape[:2]).astype('uint8')
         pred_int[:, :, i] = out_int
 
-        out_dec = (torch.squeeze(y).numpy()*65535).astype('uint16')
+        out_dec = (torch.squeeze(y).numpy() * 65535).astype('uint16')
         out_dec = out_dec[:, :img.shape[0], :img.shape[1]]
         pred[:, :, :, i] = out_dec
         print(i)
-    sf = fn[0:-4]+'_pred.mat'
+    sf = f'{fn[:-4]}_pred.mat'
     sio.savemat(sf, {'pred': pred, 'pred_int': pred_int})

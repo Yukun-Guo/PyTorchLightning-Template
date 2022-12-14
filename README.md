@@ -3,10 +3,11 @@
 ## 1. create new env using python
 
 ```{bash}
-python -m venv /path/to/new/virtual/environment
+python -m venv env
 python -m ensurepip --upgrade
 python -m pip install --upgrade pip
 ```
+
 ## or create new env using conda
 
 ```{bash}
@@ -18,4 +19,18 @@ conda install pip
 
 ```{bash}
 pip install -r requirements.txt
+```
+
+## 3. install [pytorch](https://pytorch.org/get-started/locally/)
+
+```{bash}
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+```
+
+## 4. install segmentation-models-pytorch
+
+```{bash}
+pip install git+https://github.com/qubvel/segmentation_models.pytorch
+// or
+pip install git+https://github.com/Yukun-Guo/segmentation_models_pytorch
 ```
