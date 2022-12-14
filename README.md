@@ -11,6 +11,7 @@ python -m pip install --upgrade pip
 
 ```{bash}
 conda create -n myenv python=3.x
+conda install pip
 ```
 
 ## 2. install requirements.txt
