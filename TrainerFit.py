@@ -17,7 +17,12 @@ net_model = NetModel(backbone_net=CNNNet, input_size=(384, 288))
 data_model = DataModel(img_list, gt_list, data_split_idx=(data_split_idx[0], data_split_idx[1]), img_size=(
     384, 288), batch_size=8)
 
-trainer = ptl.Trainer(logger=net_model.configure_loggers(), accelerator='gpu', devices=1, max_epochs=5000,  # strategy='dp',
-                      log_every_n_steps=1, auto_lr_find=True)
+trainer = ptl.Trainer(logger=net_model.configure_loggers(),
+                      accelerator='gpu',
+                      devices=2,
+                      max_epochs=5000,
+                      strategy='dp',  # strategy='ddp_sharded', # model parallelism,
+                      log_every_n_steps=1,
+                      auto_lr_find=True)
 
 trainer.fit(net_model, datamodule=data_model)
