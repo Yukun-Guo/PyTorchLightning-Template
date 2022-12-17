@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from torchsummaryX import summary
 
 
@@ -584,7 +584,7 @@ class DenseNet3D(nn.Module):
 
 
 if __name__ == '__main__':
-    writer = SummaryWriter('logs')
+    # writer = SummaryWriter('logs')
 
     #
     # net = ExampleCNN()

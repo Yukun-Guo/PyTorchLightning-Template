@@ -9,7 +9,8 @@ import random
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-from Utils.utils import shuffle_lists, listFiles, k_fold_split
+from Utils.utils import shuffle_lists, listFiles, k_fold_split, read_img_list_to_npy
+from Utils.DataAugmentation import GrayJitter, RandomCrop2D, RandomFlip
 
 
 class myDataset_mat(Dataset):
@@ -25,7 +26,7 @@ class myDataset_mat(Dataset):
         else:
             self.mat = self._read_mat_list_to_npy(mat_list, img_tag, msk_tag)
         self.transform = transforms.Compose(
-            [GrayJitter(), RandomHorizontalFlip(), RandomCrop(out_size), Normalize(), ToTensor()])
+            [GrayJitter(), RandomFlip(axis=1), RandomCrop2D(out_size), Normalize(), ToTensor()])
 
     @staticmethod
     def _read_mat_list_to_npy(file_list, img_tag, msk_tag):
@@ -59,204 +60,38 @@ class myDataset_mat(Dataset):
         return sample['img'], (sample['mask1'], sample['mask2'])
 
 
-class GrayJitter(object):
-    def __init__(self, bright_range=(0, 40), contrast_range=(0.5, 1.5), max_value=255):
-        self.bright_range = bright_range
-        self.contrast_range = contrast_range
-        self.max_value = max_value
-
-    def __call__(self, sample):
-        img, mask1, mask2 = sample['img'], sample['mask1'], sample['mask2']
-        bright_scale = random.uniform(
-            self.bright_range[0], self.bright_range[1])
-        contrast_scale = random.uniform(
-            self.contrast_range[0], self.contrast_range[1])
-        meanv = torch.mean(img)
-        img = (img - meanv) * contrast_scale + meanv
-        img = img + bright_scale
-        img = torch.clip(img, 0, self.max_value)
-        return {'img': img, 'mask1': mask1, 'mask2': mask2}
-
-
-class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=5.):
-        self.std = std
-        self.mean = mean
-
-    def __call__(self, sample):
-        img, ilm, thk, msk = sample['img'], sample['ilm'], sample['thk'], sample['msk']
-        img = torch.clip(img + torch.randn(img.size())
-                         * self.std + self.mean, 0, 255)
-        ilm = torch.clip(ilm + torch.randn(ilm.size())
-                         * 1.1 + self.mean, 0, 255)
-        thk = torch.clip(thk + torch.randn(thk.size())
-                         * 1.1 + self.mean, 0, 255)
-
-        return {'img': img, 'ilm': ilm, 'thk': thk, 'msk': msk}
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
-
-
-class RandomRotate90n(object):
-    """Rotate the given PIL Image randomly with a given probability.
-
-    Args:
-
+class myDataset_img(Dataset):
+    """
+        Rewrite this class for your project
     """
 
-    def __call__(self, sample):
-        image, mask = sample['img'], sample['mask']
-        degree = random.randint(0, 3)
-        image = F.rotate(image, 90 * degree)
-        mask = torch.squeeze(F.rotate(torch.unsqueeze(mask, 0), 90 * degree))
-        return {'img': image, 'mask': mask}
+    def __init__(self, img_list, gt_list, out_size, shuffle=True):
+        if shuffle:
+            img_list, gt_list = shuffle_lists(img_list, gt_list)
 
+        self.imgs = read_img_list_to_npy(img_list, color_mode='gray')
+        self.gts = read_img_list_to_npy(gt_list, color_mode='idx')
+        self.transform = transforms.Compose(
+            [GrayJitter(), RandomFlip(axis=1), RandomCrop2D(out_size), Normalize(), ToTensor()])
 
-class RandomHorizontalFlip(object):
-    """Horizontally flip the given PIL Image randomly with a given probability.
+    def __len__(self):
+        return len(self.imgs)
 
-    Args:
-        p (float): probability of the image being flipped. Default value is 0.5
-    """
+    def __getitem__(self, item):
+        if torch.is_tensor(item):
+            item = item.tolist()
 
-    def __init__(self, p=0.5):
-        self.p = p
+        img, mask = self.imgs[item], self.gts[item]
 
-    def __call__(self, sample):
-        image, mask1, mask2 = sample['img'], sample['mask1'], sample['mask2']
-        if random.random() < self.p:
-            image = F.hflip(image)
-            mask1 = F.hflip(mask1)
-            mask2 = F.hflip(mask2)
-        return {'img': image, 'mask1': mask1, 'mask2': mask2}
+        img = np.expand_dims(img, 0)
 
+        # mask 1: retinal tissue and FV, 0: background
+        msk1 = np.clip(mask, 0, 1)
+        msk2 = mask
+        sample = {'img': img, 'mask1': msk1, 'mask2': msk2}
 
-class RandomVerticalFlip(object):
-    """Horizontally flip the given PIL Image randomly with a given probability.
-
-    Args:
-        p (float): probability of the image being flipped. Default value is 0.5
-    """
-
-    def __init__(self, p=0.5):
-        self.p = p
-
-    def __call__(self, sample):
-        image, mask = sample['img'], sample['mask']
-        if random.random() < self.p:
-            image = F.vflip(image)
-            mask = F.vflip(mask)
-        return {'img': image, 'mask': mask}
-
-
-class RandomCrop(object):
-    """Crop the given PIL Image at a random location.
-
-    Args:
-        output_size (sequence or int): Desired output size of the crop. If size is an
-            int instead of sequence like (h, w), a square crop (size, size) is
-            made.
-        padding (int or sequence, optional): Optional padding on each border
-            of the image. Default is None, i.e no padding. If a sequence of length
-            4 is provided, it is used to pad left, top, right, bottom borders
-            respectively. If a sequence of length 2 is provided, it is used to
-            pad left/right, top/bottom borders, respectively.
-        pad_if_needed (boolean): It will pad the image if smaller than the
-            desired size to avoid raising an exception. Since cropping is done
-            after padding, the padding seems to be done at a random offset.
-        fill: Pixel fill value for constant fill. Default is 0. If a tuple of
-            length 3, it is used to fill R, G, B channels respectively.
-            This value is only used when the padding_mode is constant
-        padding_mode: Type of padding. Should be: constant, edge, reflect or symmetric. Default is constant.
-
-             - constant: pads with a constant value, this value is specified with fill
-
-             - edge: pads with the last value on the edge of the image
-
-             - reflect: pads with reflection of image (without repeating the last value on the edge)
-
-                padding [1, 2, 3, 4] with 2 elements on both sides in reflect mode
-                will result in [3, 2, 1, 2, 3, 4, 3, 2]
-
-             - symmetric: pads with reflection of image (repeating the last value on the edge)
-
-                padding [1, 2, 3, 4] with 2 elements on both sides in symmetric mode
-                will result in [2, 1, 1, 2, 3, 4, 4, 3]
-
-    """
-
-    def __init__(self, output_size, padding=None, pad_if_needed=True, fill=0, padding_mode='constant'):
-
-        assert isinstance(output_size, (int, tuple))
-        if isinstance(output_size, int):
-            self.size = (output_size, output_size)
-        else:
-            assert len(output_size) == 2
-            self.size = output_size
-
-        self.padding = padding
-        self.pad_if_needed = pad_if_needed
-        self.fill = fill
-        self.padding_mode = padding_mode
-
-    @staticmethod
-    def get_params(img, output_size, mask=None):
-        w, h = img.shape[-2:][::-1]
-        th, tw = output_size
-        range_w = 1 if w == tw else w - tw
-        if h == th:
-            range_h = 1
-        elif mask is not None:
-            rowline = torch.sum(mask, (1, ))
-            if torch.sum(rowline) != 0:
-                idx = torch.nonzero(rowline)
-                off = torch.tensor(h - th)
-                range_h = torch.min(off, idx[0]).numpy()[0]
-            else:
-                range_h = 1
-        else:
-            range_h = h - th
-        i = random.randint(0, range_h)
-        j = random.randint(0, range_w)
-        return i, j, th, tw
-
-    def __call__(self, sample):
-        img, mask1, mask2 = sample['img'], sample['mask1'], sample['mask2']
-        if self.padding is not None:
-            img = F.pad(img, self.padding, self.fill, self.padding_mode)
-            mask1 = F.pad(mask1, self.padding, self.fill, self.padding_mode)
-            mask2 = F.pad(mask2, self.padding, self.fill, self.padding_mode)
-
-        # pad the width if needed
-        size = img.shape[-2:][::-1]
-        if self.pad_if_needed and size[0] < self.size[1]:
-            img = F.pad(img, [self.size[1] - size[0], 0],
-                        self.fill, self.padding_mode)
-            mask1 = F.pad(mask1, [self.size[1] - size[0],
-                          0], self.fill, self.padding_mode)
-            mask2 = F.pad(mask2, [self.size[1] - size[0],
-                          0], self.fill, self.padding_mode)
-
-        # pad the height if needed
-        if self.pad_if_needed and size[1] < self.size[0]:
-            img = F.pad(img, [0, self.size[0] - size[1]],
-                        self.fill, self.padding_mode)
-            mask1 = F.pad(mask1, [0, self.size[0] - size[1]],
-                          self.fill, self.padding_mode)
-            mask2 = F.pad(mask2, [0, self.size[0] - size[1]],
-                          self.fill, self.padding_mode)
-
-        i, j, h, w = self.get_params(img, self.size, mask1)
-
-        img = F.crop(img, i, j, h, w)
-        mask1 = F.crop(mask1, i, j, h, w)
-        mask2 = F.crop(mask2, i, j, h, w)
-
-        return {'img': img, 'mask1': mask1, 'mask2': mask2}
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
+        sample = self.transform(sample)
+        return sample['img'], (sample['mask1'], sample['mask2'])
 
 
 class Normalize(object):
@@ -318,14 +153,10 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from torchvision.utils import make_grid
 
-    file_list = listFiles('F:\Data4LayerSegmentation\_Dataset_v2_', '*.mat')
-    lists, idxs = k_fold_split(file_list[:10], 5)
-
-    print(lists)
-    print(idxs)
-
-    dataset = myDataset_mat(
-        lists[0][1], (384, 288), img_tag='imgMat', msk_tag='imgMask')
+    img_list = listFiles('data/images', '*.png')
+    gt_list = listFiles('data/groundtruth', '*.png')
+    file_list = list(zip(img_list, gt_list))
+    dataset = myDataset_img(img_list, gt_list, (384, 288))
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     print(len(dataloader))
 

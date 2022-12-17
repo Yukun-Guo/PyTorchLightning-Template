@@ -13,7 +13,8 @@ def read_file_list(list_txt_file):
 
 
 def listFiles(folder, file_filter="**/*", recursive=True):
-    return list(glob.iglob(os.path.join(folder, file_filter), recursive=recursive))
+    return list(
+        glob.iglob(os.path.join(folder, file_filter), recursive=recursive))
 
 
 def split_list(file_list, split=(0.8, 0.2, 0), shuffle=True):
@@ -32,8 +33,8 @@ def k_fold_split(file_list, fold=5):
     kFold_list_file = []
     kFold_list_idx = []
     data_set_length = len(file_list)
-    index = np.tile(np.arange(0, fold), data_set_length //
-                    fold + 1)[:data_set_length]
+    index = np.tile(np.arange(0, fold),
+                    data_set_length // fold + 1)[:data_set_length]
     for i in range(fold):
         flg_valid = np.where(index == i)[0]
         flg_train = np.where(index != i)[0]
@@ -65,22 +66,41 @@ def shuffle_lists(*file_lists):
         return zip(*list_files)
 
 
-def read_mat_list_to_npy(file_list, shuffle=True):
+def read_mat_list_to_npy2d(file_list, shuffle=True):
     npy_data = []
     if shuffle:
         np.random.shuffle(file_list)
     for f in file_list:
         mat = sio.loadmat(f)
-        img, mask = np.array(mat['imgMat'], dtype='float32'), np.array(
-            mat['maskMat'], dtype='int64')
+        img, mask = np.array(mat['imgMat'],
+                             dtype='float32'), np.array(mat['maskMat'],
+                                                        dtype='int64')
 
-        npy_data.extend((img[:, :, i], mask[:, :, i])
-                        for i in range(img.shape[2]))
+        npy_data.extend(
+            (img[:, :, i], mask[:, :, i]) for i in range(img.shape[2]))
+        print(f'reading {f}')
+    return npy_data
+
+
+def read_mat_list_to_npy3d(file_list,
+                           shuffle=False,
+                           img_tag='imgMat',
+                           mask_tag='maskMat'):
+    npy_data = []
+    if shuffle:
+        np.random.shuffle(file_list)
+    for f in file_list:
+        mat = sio.loadmat(f)
+        img, mask = np.array(mat[img_tag],
+                             dtype='float32'), np.array(mat[mask_tag],
+                                                        dtype='int64')
+        npy_data.append((img, mask))
         print(f'reading {f}')
     return npy_data
 
 
 def read_img_list_to_npy(file_list, color_mode, shuffle=False):
+
     def _read_image(image_file_name, mode=None):
         """
          Read image from file.
@@ -89,16 +109,21 @@ def read_img_list_to_npy(file_list, color_mode, shuffle=False):
         :return: numpy image
         """
         img = Image.open(image_file_name.rstrip())
+        dty = 'float32'
         if mode is not None:
             if mode.lower() == 'gray':
                 img = img.convert('L')
+                dty = 'float32'
             else:
                 if mode.lower() == 'rgb':
                     img = img.convert('RGB')
+                    dty = 'float32'
                 else:
                     if mode.lower() == 'idx':
                         img = img.convert('P')
-        return np.asarray(img, dtype='float32')
+                        dty = 'int64'
+        return np.asarray(img, dtype=dty)
+
     npy_data = []
     l = len(file_list)
     if shuffle:
@@ -106,11 +131,14 @@ def read_img_list_to_npy(file_list, color_mode, shuffle=False):
     for i, f in enumerate(file_list):
         im = _read_image(f, color_mode)
         npy_data.append(im)
-        print('reading {:.2f}%'.format(i/l*100))
+        print('reading {:.2f}%'.format(i / l * 100))
     return npy_data
 
 
-def split_dataset_npy(npy_file, split_ratio=(0.8, 0.2, 0), split_idx=None, shuffle=True):
+def split_dataset_npy(npy_file,
+                      split_ratio=(0.8, 0.2, 0),
+                      split_idx=None,
+                      shuffle=True):
     """
     :param npy_file: 'data.npy'
     :param split_ratio: (train,test,valid) = (0.8, 0.2, 0)
@@ -124,8 +152,9 @@ def split_dataset_npy(npy_file, split_ratio=(0.8, 0.2, 0), split_idx=None, shuff
         if shuffle:
             np.random.shuffle(data)
         data_num = len(data)
-        split_rg = [int(np.ceil(element * data_num))
-                    for element in split_ratio]
+        split_rg = [
+            int(np.ceil(element * data_num)) for element in split_ratio
+        ]
         s = sum(split_rg[:2])
         train = data[:split_rg[0]]
         test = data[split_rg[0]:s]
@@ -418,8 +447,8 @@ def find_best_row_col(n):
             cols = np.int(n / rows)
             break
     cols, rows = [rows, cols] if cols < rows else [cols, rows]
-    rows, cols = [np.int(np.ceil(n / t)),
-                  t] if rows == 1 or cols / rows > 3 else [rows, cols]
+    rows, cols = [np.int(np.ceil(n / t)), t
+                  ] if rows == 1 or cols / rows > 3 else [rows, cols]
     return rows, cols
 
 

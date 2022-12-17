@@ -56,14 +56,12 @@ class NetModel(ptl.LightningModule):
             y_hat1_s, y1) + dice.DiceLoss(mode='binary')(y_hat1_s, y1)
         loss2 = F.cross_entropy(y_hat2, y2) + \
             dice.DiceLoss(mode='multiclass')(y_hat2_s, y2)
+
         train_loss = (loss1 + loss2) / 2
 
-        # acc1 = FM.accuracy(y_hat1_s, y1.type(torch.int64))
-        # acc2 = FM.accuracy(y_hat2_s, y2)
-        # train_acc = (acc1 + acc2) / 2
-
-        iou1 = FM.iou(y_hat1_s, y1.type(torch.int64))
-        iou2 = FM.iou(y_hat2_s, y2)
+        iou1 = FM.jaccard_index(y_hat1_s, y1, task='binary')
+        iou2 = FM.jaccard_index(
+            y_hat2_s, y2, task='multiclass', num_classes=12)
         train_iou = (iou1 + iou2) / 2
 
         self.logger.experiment.add_scalars("losses",
@@ -90,8 +88,9 @@ class NetModel(ptl.LightningModule):
         # acc2 = FM.accuracy(y_hat2_s, y2)
         # val_acc = (acc1 + acc2) / 2
 
-        iou1 = FM.iou(y_hat1_s, y1.type(torch.int64))
-        iou2 = FM.iou(y_hat2_s, y2)
+        iou1 = FM.jaccard_index(y_hat1_s, y1, task='binary')
+        iou2 = FM.jaccard_index(
+            y_hat2_s, y2, task='multiclass', num_classes=12)
         val_iou = (iou1 + iou2) / 2
 
         self.logger.experiment.add_scalars("losses", {"val_loss": val_loss},
@@ -101,35 +100,35 @@ class NetModel(ptl.LightningModule):
         self.log_dict({'val_loss': val_loss, 'val_iou': val_iou})
         # log images
 
-        x = resize_right.resize(x, scale_factors=0.5)
-        y_hat1 = resize_right.resize(y_hat1, scale_factors=0.5)
-        y_hat2 = resize_right.resize(y_hat2, scale_factors=0.5)
-        y_hat1 = torch.argmax(y_hat1, 1, keepdim=False)
-        y_hat2 = torch.argmax(y_hat2, 1, keepdim=False)
-        y1_log = apply_colormap(y_hat1.cpu().numpy())
-        y2_log = apply_colormap(y_hat2.cpu().numpy())
+        # x = resize_right.resize(x, scale_factors=0.5)
+        # y_hat1 = resize_right.resize(y_hat1, scale_factors=0.5)
+        # y_hat2 = resize_right.resize(y_hat2, scale_factors=0.5)
+        # y_hat1 = torch.argmax(y_hat1, 1, keepdim=False)
+        # y_hat2 = torch.argmax(y_hat2, 1, keepdim=False)
+        # y1_log = apply_colormap(y_hat1.cpu().numpy())
+        # y2_log = apply_colormap(y_hat2.cpu().numpy())
 
-        y1_true = apply_colormap(np.ceil(y1.cpu().numpy()).astype('int64'))
-        y2_true = apply_colormap(np.ceil(y2.cpu().numpy()).astype('int64'))
+        # y1_true = apply_colormap(np.ceil(y1.cpu().numpy()).astype('int64'))
+        # y2_true = apply_colormap(np.ceil(y2.cpu().numpy()).astype('int64'))
 
-        self.logger.experiment.add_images("bscans", x, self.current_epoch)
-        self.logger.experiment.add_images("pred1",
-                                          y1_log,
-                                          self.current_epoch,
-                                          dataformats='NHWC')
-        self.logger.experiment.add_images("gt1",
-                                          y1_true,
-                                          self.current_epoch,
-                                          dataformats='NHWC')
-        self.logger.experiment.add_images("pred2",
-                                          y2_log,
-                                          self.current_epoch,
-                                          dataformats='NHWC')
-        self.logger.experiment.add_images("gt2",
-                                          y2_true,
-                                          self.current_epoch,
-                                          dataformats='NHWC')
-        self.logger.experiment.flush()
+        # self.logger.experiment.add_images("bscans", x, self.current_epoch)
+        # self.logger.experiment.add_images("pred1",
+        #                                   y1_log,
+        #                                   self.current_epoch,
+        #                                   dataformats='NHWC')
+        # self.logger.experiment.add_images("gt1",
+        #                                   y1_true,
+        #                                   self.current_epoch,
+        #                                   dataformats='NHWC')
+        # self.logger.experiment.add_images("pred2",
+        #                                   y2_log,
+        #                                   self.current_epoch,
+        #                                   dataformats='NHWC')
+        # self.logger.experiment.add_images("gt2",
+        #                                   y2_true,
+        #                                   self.current_epoch,
+        #                                   dataformats='NHWC')
+        # self.logger.experiment.flush()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=0.002)  # 0

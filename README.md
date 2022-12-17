@@ -24,6 +24,11 @@ pip install -r requirements.txt
 ## 3. install [pytorch](https://pytorch.org/get-started/locally/)
 
 ```{bash}
+# windows
+
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+
+# linux
 pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 ```
 
