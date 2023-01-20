@@ -56,7 +56,7 @@ def restore_size(img, raw_size):
 
 # load model
 model_path = 'logs\myBackboneNet\myBackboneNet-fold=1-epoch=017-val_loss=1.06065.ckpt'
-model = NetModel(CNNNet, None, None).load_from_checkpoint(model_path)
+model = NetModel.load_from_checkpoint(model_path)
 model.freeze()
 model.cuda()
 
