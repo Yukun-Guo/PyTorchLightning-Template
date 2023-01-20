@@ -19,7 +19,7 @@ data_split_idx = split_list(file_list, split=(0.7, 0.3))
 # data_split_idx = [[3, 7], [0, 1, 2]]
 
 model_path = 'logs\myBackboneNet\myBackboneNet-fold=1-epoch=017-val_loss=1.06065.ckpt'
-net_model = NetModel(CNNNet).load_from_checkpoint(model_path)
+net_model = NetModel.load_from_checkpoint(model_path)
 
 data_model = DataModel(file_list=file_list,
                        data_split_idx=data_split_idx,
