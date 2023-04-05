@@ -26,13 +26,23 @@ pip install -r requirements.txt
 ```{bash}
 # windows
 
-pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 
 # linux
-pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+pip3 install torch torchvision torchaudio
+
+# mac
+# CUDA is not available on MacOS, please use default package
+pip3 install torch torchvision torchaudio
 ```
 
-## 4. install segmentation-models-pytorch
+## 4. install [pytroch-lightning](https://pytorch-lightning.readthedocs.io/en/latest/new-project.html)
+
+```{bash}
+pip install lightning
+```
+
+## 5. install segmentation-models-pytorch
 
 ```{bash}
 pip install git+https://github.com/qubvel/segmentation_models.pytorch
