@@ -3,3 +3,5 @@ numpy==1.19.5
 Pillow==9.2.0
 scipy
 torchsummary
+torchsummaryX
+tensorboard
