@@ -1,7 +1,7 @@
-matplotlib==3.4.1
-numpy==1.19.5
-Pillow==9.2.0
+matplotlib
+numpy
+Pillow
 scipy
 torchsummary
 torchsummaryX
-tensorboard
+lightning

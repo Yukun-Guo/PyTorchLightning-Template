@@ -1,12 +1,9 @@
 import torch
 import numpy as np
 import scipy.io as sio
-import pytorch_lightning as ptl
-from ModuleNet import NetModel
-from MyNetwrok import CNNNet
+from NetModule import NetModule
 from torchmetrics import functional as MF
 import torch.nn.functional as F
-
 
 def read_mat_to_npy(filename):
     mat = sio.loadmat(filename)
@@ -56,12 +53,12 @@ def restore_size(img, raw_size):
 
 # load model
 model_path = 'logs\myBackboneNet\myBackboneNet-fold=1-epoch=017-val_loss=1.06065.ckpt'
-model = NetModel.load_from_checkpoint(model_path)
+model = NetModule.load_from_checkpoint(model_path)
 model.freeze()
 model.cuda()
 
 # load data
-file_list = r"F:\Data4LayerSegmentation\_Dataset\_ArrangedData\totalDataset\_mat_list.txt"
+file_list = "F:\Data4LayerSegmentation\_Dataset\_ArrangedData\totalDataset\_mat_list.txt"
 files = read_file_list(file_list)
 kFold_list_list, kFold_list_idx = k_fold_split(files, fold=4)
 print(kFold_list_list[0][0])

@@ -214,7 +214,7 @@ class CNNNet(nn.Module):
 
 
 if __name__ == '__main__':
-    model = CNNNet(1, 3)
+    model = CNNNet(1, 3,out_activation=None)
     x = torch.randn(1, 1, 304, 304, requires_grad=True)
 
     # Export the model

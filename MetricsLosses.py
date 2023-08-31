@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
+import torchmetrics as tm
 
 # losses
-
 
 def _jaccard_loss(y_pred, y_true, smooth=1., axis=(1, 2, 3)):
     intersection = torch.sum(y_true * y_pred, dim=axis)

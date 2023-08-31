@@ -1,10 +1,10 @@
-import pytorch_lightning as ptl
-from ModuleNet import NetModel
-from ModuleData import DataModel
-from MyNetwrok import CNNNet
+import lightning as L
+from NetModule import NetModule
+from DataModule import DataModel
+from Network import CNNNet
 from Utils.utils import listFiles, split_list
 
-ptl.seed_everything(1234)
+L.seed_everything(1234)
 
 img_list = listFiles("data\images", '*.png')
 gt_list = listFiles("data\groundtruth", '*.png')
@@ -19,14 +19,14 @@ data_split_idx = split_list(file_list, split=(0.7, 0.3))
 # data_split_idx = [[3, 7], [0, 1, 2]]
 
 model_path = 'logs\myBackboneNet\myBackboneNet-fold=1-epoch=017-val_loss=1.06065.ckpt'
-net_model = NetModel.load_from_checkpoint(model_path)
+net_model = NetModule.load_from_checkpoint(model_path)
 
 data_model = DataModel(file_list=file_list,
                        data_split_idx=data_split_idx,
                        img_size=(384, 288),
                        batch_size=8)
 
-trainer = ptl.Trainer(logger=net_model.configure_loggers(),
+trainer = L.Trainer(logger=net_model.configure_loggers(),
                       gpus=1,
                       max_epochs=5000,
                       progress_bar_refresh_rate=1,

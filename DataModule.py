@@ -1,10 +1,10 @@
+import lightning as L
 from typing import Optional
-import pytorch_lightning as plt
 from torch.utils.data import DataLoader
-from PreprocessData import myDataset_img
+from DataPreprocessing import myDataset_img
 
 
-class DataModel(plt.LightningDataModule):
+class DataModel(L.LightningDataModule):
 
     def __init__(self, img_list: list, gt_list: list, data_split_idx: list, img_size: tuple = (384, 288), batch_size: int = 32, img_tag='imgMat', msk_tag='imgMask'):
         super().__init__()

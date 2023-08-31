@@ -1,20 +1,16 @@
 import torch
 import torch.nn.functional as F
-import pytorch_lightning as ptl
+import lightning as L
 from torchmetrics import functional as FM
-from pytorch_lightning.callbacks import early_stopping, model_checkpoint, lr_monitor
-from pytorch_lightning.loggers import TensorBoardLogger
-import numpy as np
-from MyNetwrok import CNNNet
-from losses import dice, soft_bce, soft_ce
+from lightning.pytorch.callbacks import early_stopping, model_checkpoint, lr_monitor
+from lightning.pytorch.loggers import TensorBoardLogger
+from Network import CNNNet
+from losses import dice, soft_bce
 from Utils.utils import apply_colormap
 from torchsummary import summary
-from torch.utils.data import DataLoader
-from PreprocessData import myDataset_mat
-from Utils import resize_right
 
 
-class NetModel(ptl.LightningModule):
+class NetModule(L.LightningModule):
 
     def __init__(self,
                  backbone_net,
@@ -22,7 +18,7 @@ class NetModel(ptl.LightningModule):
                  img_chn=1,
                  log_dir='logs/',
                  k_fold=0):
-        super(NetModel, self).__init__()
+        super(NetModule, self).__init__()
 
         self.save_hyperparameters()
         self.input_size = input_size
@@ -176,6 +172,6 @@ class NetModel(ptl.LightningModule):
 
 if __name__ == '__main__':
 
-    model = NetModel(CNNNet)
+    model = NetModule(CNNNet)
     model.summary()
     model.to_onnx('test.onnx')
