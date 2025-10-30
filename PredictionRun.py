@@ -11,7 +11,6 @@ def read_mat_to_npy(filename):
                          dtype='float32'), np.array(mat['maskMat'],
                                                     dtype='int64')
     npy_data = [(img[:, :, i], mask[:, :, i]) for i in range(img.shape[2])]
-    print(f'reading {filename}')
     return npy_data
 
 

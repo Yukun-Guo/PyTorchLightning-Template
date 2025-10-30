@@ -1,3 +1,4 @@
+import os
 import lightning as L
 import torch
 from NetModule import NetModule
@@ -6,11 +7,17 @@ from Network import CNNNet
 import numpy as np
 from Utils.utils import listFiles, split_list
 
+# set device
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+
+
 print(torch.cuda.device_count())
 L.seed_everything(1234)
 
-img_list = listFiles("data\images", "*.png")
-gt_list = listFiles("data\groundtruth", "*.png")
+img_list = listFiles("data/images", "*.png")
+gt_list = listFiles("data/groundtruth", "*.png")
 
 data_split_idx = split_list(list(range(len(img_list))), split=(0.7, 0.3))
 

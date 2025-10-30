@@ -133,8 +133,7 @@ class NetModule(L.LightningModule):
             mode='min',
             factor=0.1,
             patience=3,
-            min_lr=1e-8,
-            verbose=True)
+            min_lr=1e-8)
         lr_scheduler = {
             'scheduler': reduce_lr_on_plateau,
             'monitor': 'val_loss',

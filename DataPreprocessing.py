@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from torchvision.transforms import functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from tqdm import tqdm
 
 from Utils.utils import shuffle_lists, listFiles, k_fold_split, read_img_list_to_npy
 from Utils.DataAugmentation import GrayJitter, RandomCrop2D, RandomFlip
@@ -28,14 +29,13 @@ class myDataset_mat(Dataset):
     @staticmethod
     def _read_mat_list_to_npy(file_list, img_tag, msk_tag):
         npy_data = []
-        for f in file_list:
+        for f in tqdm(file_list, desc='Reading files'):
             mat = sio.loadmat(f)
             img, mask = np.array(mat[img_tag], dtype='float32'), np.array(
                 mat[msk_tag], dtype='int64')
 
             npy_data.extend((img[:, :, i], mask[:, :, i])
                             for i in range(img.shape[2]))
-            print(f'Reading {f}')
         return npy_data
 
     def __len__(self):

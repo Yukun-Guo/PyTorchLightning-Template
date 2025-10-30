@@ -3,7 +3,7 @@ import scipy.io as sio
 import PIL.Image as Image
 import glob
 import os
-
+from tqdm import tqdm
 
 def read_file_list(list_txt_file):
     fp = open(list_txt_file, 'r')
@@ -70,7 +70,7 @@ def read_mat_list_to_npy2d(file_list, shuffle=True):
     npy_data = []
     if shuffle:
         np.random.shuffle(file_list)
-    for f in file_list:
+    for f in tqdm(file_list, desc='Reading files'):
         mat = sio.loadmat(f)
         img, mask = np.array(mat['imgMat'],
                              dtype='float32'), np.array(mat['maskMat'],
@@ -78,7 +78,6 @@ def read_mat_list_to_npy2d(file_list, shuffle=True):
 
         npy_data.extend(
             (img[:, :, i], mask[:, :, i]) for i in range(img.shape[2]))
-        print(f'reading {f}')
     return npy_data
 
 
@@ -89,13 +88,12 @@ def read_mat_list_to_npy3d(file_list,
     npy_data = []
     if shuffle:
         np.random.shuffle(file_list)
-    for f in file_list:
+    for f in tqdm(file_list, desc='Reading files'):
         mat = sio.loadmat(f)
         img, mask = np.array(mat[img_tag],
                              dtype='float32'), np.array(mat[mask_tag],
                                                         dtype='int64')
         npy_data.append((img, mask))
-        print(f'reading {f}')
     return npy_data
 
 
@@ -128,10 +126,9 @@ def read_img_list_to_npy(file_list, color_mode, shuffle=False):
     l = len(file_list)
     if shuffle:
         np.random.shuffle(file_list)
-    for i, f in enumerate(file_list):
+    for f in tqdm(file_list, desc='Reading files'):
         im = _read_image(f, color_mode)
         npy_data.append(im)
-        print('reading {:.2f}%'.format(i / l * 100))
     return npy_data
 
 
