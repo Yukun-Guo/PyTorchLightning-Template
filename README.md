@@ -17,16 +17,16 @@ conda install pip
 
 ## 2. Install pytorch
 
-### windows
+### Linux/windows
 
 ```{bash}
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
 
-### linux or mac
+### MacOS
 
 ```{bash}
-pip3 install torch torchvision torchaudio
+pip3 install torch torchvision
 ```
 
 ## 3. Install requirements.txt
@@ -38,7 +38,5 @@ pip install -r requirements.txt
 ## 4. Install segmentation-models-pytorch
 
 ```{bash}
-pip install git+https://github.com/qubvel/segmentation_models.pytorch
-# or
-pip install git+https://github.com/Yukun-Guo/segmentation_models_pytorch
+pip install git+https://github.com/qubvel-org/segmentation_models.pytorch
 ```
