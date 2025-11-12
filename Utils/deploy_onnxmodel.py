@@ -1,13 +1,10 @@
-import onnx
 import os
 import zlib
 from onnxruntime.quantization import quantize_dynamic, QuantType
 from NetModule import NetModule
 import torch
 
-# a simple encryption method for ONNX model
-
-
+# Toy encryption/decryption method for ONNX model
 def encrypt_onnxmodel(ckpt_path, out_path: str='./model', opset: int = 18, input_shape: tuple = (1, 1, 480, 288), enable_quantize=False, saved_model_filename="enc_model.enc", encrypt_key: int = 1234):
     model = NetModule.load_from_checkpoint(ckpt_path)
     model.eval()
@@ -42,8 +39,6 @@ def encrypt_onnxmodel(ckpt_path, out_path: str='./model', opset: int = 18, input
         verbose=True,
     )
 
-    # Load the exported model proto from the saved ONNX file
-    model_proto = onnx.load(model_file)
     # If quantization is enabled, quantize the model use static quantization
     if enable_quantize:
         # quantize_dynamic accepts a path for input; use the saved model file
@@ -65,8 +60,6 @@ def encrypt_onnxmodel(ckpt_path, out_path: str='./model', opset: int = 18, input
     # Write the encrypted and compressed model to a new file
     with open(os.path.join(out_path, saved_model_filename), "wb") as f:
         f.write(zlib_model)
-    
-
 
 def decrypt_onnxmodel(model_path, encrypt_key: int = 1234):
     """
@@ -97,4 +90,55 @@ def decrypt_onnxmodel(model_path, encrypt_key: int = 1234):
         )
 
     # Return the decrypted model buffer
+    return model_buffer
+
+# Save ONNX model
+def save_onnxmodel(ckpt_path, out_path: str='./model', opset: int = 18, input_shape: tuple = (1, 1, 480, 288), enable_quantize=False, saved_model_filename="model.onnx"):
+    model = NetModule.load_from_checkpoint(ckpt_path)
+    model.eval()
+    device = torch.device('cpu')
+    model.to(device)
+
+    input_sample = torch.randn(input_shape, device=device)
+
+    input_names = ['input']
+    output_names = ['output']
+    # allow dynamic batch, height and width
+    dynamic_axes = {
+        'input': {0: 'batch_size', 2: 'height', 3: 'width'},
+        'output': {0: 'batch_size', 2: 'height', 3: 'width'},
+    }
+    # Ensure output directory exists (fixes FileNotFoundError when external data is written)
+    os.makedirs(out_path, exist_ok=True)
+
+    model_file = os.path.join(out_path, saved_model_filename)
+
+    torch.onnx.export(
+        model,
+        input_sample,
+        model_file,
+        export_params=True,
+        opset_version=opset,
+        external_data=False,
+        do_constant_folding=True,
+        input_names=input_names,
+        output_names=output_names,
+        dynamic_axes=dynamic_axes,
+        verbose=True,
+    )
+
+def load_onnxmodel(model_path):
+    """
+    Example loads an ONNX model file.
+
+    Args:
+        model_path (str): The path to the ONNX model file.
+
+    Returns:
+        model buffer
+    """
+    # Read the ONNX model file into a buffer
+    with open(model_path, "rb") as f:
+        model_buffer = f.read()
+    # Return the model buffer
     return model_buffer

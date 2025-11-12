@@ -1,24 +1,78 @@
+"""
+Neural network architectures for image segmentation.
+
+This module implements custom CNN architectures based on ResNet blocks with
+U-Net-style skip connections for semantic segmentation tasks.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from Utils.network_modules import Conv2dReLU, Activation
 from torchsummary import summary
+from typing import Optional, Tuple
 
 
 class ResNetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=(2, 2)):
+    """
+    ResNet block with downsampling capability for encoder part of the network.
+    
+    This block implements a residual connection with optional downsampling.
+    It consists of two 3x3 convolutions with a skip connection that uses
+    1x1 convolution for dimension matching when needed.
+    
+    Args:
+        in_channels (int): Number of input channels
+        out_channels (int): Number of output channels
+        stride (tuple, optional): Stride for downsampling. Defaults to (2, 2).
+    
+    Architecture:
+        Input -> Conv3x3+BN+ReLU -> Conv3x3+BN -> Add skip connection -> Output
+              \-> Conv1x1 (if needed) -----------/
+    
+    Example:
+        >>> block = ResNetBlock(64, 128, stride=(2, 2))
+        >>> x = torch.randn(1, 64, 256, 256)
+        >>> out = block(x)  # Shape: (1, 128, 128, 128)
+    """
+    
+    def __init__(self, in_channels: int, out_channels: int, stride: Tuple[int, int] = (2, 2)):
+        """
+        Initialize ResNet block with downsampling.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output channels
+            stride (tuple): Convolution stride for downsampling
+        """
         super().__init__()
-        self.conv2DRelu = Conv2dReLU(in_channels, out_channels, (3, 3), padding=(1, 1), stride=stride,
-                                     use_batchnorm=True)
+        self.conv2DRelu = Conv2dReLU(
+            in_channels, out_channels, (3, 3),
+            padding=(1, 1), stride=stride, use_batchnorm=True
+        )
         self.conv2D3x3 = nn.Conv2d(
-            out_channels, out_channels, (3, 3), padding=(1, 1), bias=False)
+            out_channels, out_channels, (3, 3),
+            padding=(1, 1), bias=False
+        )
         self.conv2D1x1 = nn.Conv2d(
-            in_channels, out_channels, (1, 1), stride=stride, bias=False)
+            in_channels, out_channels, (1, 1),
+            stride=stride, bias=False
+        )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the ResNet block.
+        
+        Args:
+            x (torch.Tensor): Input tensor
+            
+        Returns:
+            torch.Tensor: Output tensor after residual connection
+        """
         out = self.conv2DRelu(x)
         out = self.conv2D3x3(out)
 
+        # Skip connection with dimension matching
         out1 = self.conv2D1x1(x)
         out += out1
 
@@ -26,16 +80,62 @@ class ResNetBlock(nn.Module):
 
 
 class ResNetBlock2(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    """
+    ResNet block without downsampling (identity mapping) for deep layers.
+    
+    This block implements the pre-activation ResNet design where batch
+    normalization and ReLU activation are applied before convolution.
+    It maintains the spatial dimensions and is used for adding depth
+    without changing feature map size.
+    
+    Args:
+        in_channels (int): Number of input channels
+        out_channels (int): Number of output channels (should equal in_channels)
+    
+    Architecture:
+        Input -> BN -> ReLU -> Conv3x3 -> BN -> ReLU -> Conv3x3 -> Add -> Output
+              \------------------------------------------------/
+    
+    Note:
+        This block assumes in_channels == out_channels for the skip connection
+        to work properly without dimension adjustment.
+    
+    Example:
+        >>> block = ResNetBlock2(128, 128)
+        >>> x = torch.randn(1, 128, 64, 64)
+        >>> out = block(x)  # Shape: (1, 128, 64, 64)
+    """
+    
+    def __init__(self, in_channels: int, out_channels: int):
+        """
+        Initialize ResNet block without downsampling.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output channels
+        """
         super().__init__()
         self.bn1 = nn.BatchNorm2d(in_channels)
-        self.conv1 = nn.Conv2d(in_channels, out_channels,
-                               (3, 3), padding=(1, 1), bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels, out_channels, (3, 3),
+            padding=(1, 1), bias=False
+        )
         self.bn2 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels,
-                               (3, 3), padding=(1, 1), bias=False)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, (3, 3),
+            padding=(1, 1), bias=False
+        )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the identity ResNet block.
+        
+        Args:
+            x (torch.Tensor): Input tensor
+            
+        Returns:
+            torch.Tensor: Output tensor after residual connection
+        """
         out = self.bn1(x)
         out = F.relu(out)
         out = self.conv1(out)
@@ -44,15 +144,54 @@ class ResNetBlock2(nn.Module):
         out = F.relu(out)
         out = self.conv2(out)
 
+        # Identity skip connection
         out += x
 
         return out
 
 
 class CNNNet(nn.Module):
-    def __init__(self, in_channels, out_channels, out_activation):
+    """
+    Custom CNN architecture for semantic segmentation based on ResNet and U-Net.
+    
+    This network implements an encoder-decoder architecture with skip connections:
+    - Encoder: ResNet-based blocks with progressive downsampling
+    - Decoder: Upsampling with feature concatenation from encoder
+    - Skip connections: Features from encoder are concatenated with decoder features
+    
+    The network processes images through multiple scales:
+    - 1x: Original resolution
+    - 1/2: Half resolution  
+    - 1/4: Quarter resolution
+    - 1/8: Eighth resolution
+    - 1/16: Sixteenth resolution (bottleneck)
+    
+    Args:
+        in_channels (int): Number of input channels (e.g., 1 for grayscale, 3 for RGB)
+        out_channels (int): Number of output classes for segmentation
+        out_activation (str or None): Output activation function name or None
+    
+    Architecture Overview:
+        Input -> Encoder (downsampling + skip connections) -> Decoder (upsampling + concatenation) -> Output
+    
+    Example:
+        >>> model = CNNNet(in_channels=1, out_channels=4, out_activation=None)
+        >>> x = torch.randn(1, 1, 256, 256)
+        >>> output = model(x)  # Shape: (1, 4, 256, 256)
+    """
+    
+    def __init__(self, in_channels: int, out_channels: int, out_activation: Optional[str]):
+        """
+        Initialize the CNN network.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output classes
+            out_activation (str or None): Output activation function
+        """
         super().__init__()
 
+        # Channel progression through the network
         hid_chns = [64, 96, 128, 192, 128, 96, 64, 32, 16]
         # bottom
         self.bn1 = nn.BatchNorm2d(in_channels)
@@ -133,9 +272,32 @@ class CNNNet(nn.Module):
             hid_chns[8], out_channels, kernel_size=(3, 3), padding=(1, 1))  # 1
         self.out = Activation(out_activation)
 
-    def forward(self, x, mask=None):
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Forward pass through the CNN network.
+        
+        Performs encoder-decoder processing with skip connections:
+        1. Encoder: Progressive downsampling through ResNet blocks
+        2. Bottleneck: Deepest feature processing at 1/16 resolution
+        3. Decoder: Progressive upsampling with skip connections
+        4. Output: Final classification layer
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, in_channels, height, width)
+            mask (torch.Tensor, optional): Optional mask for selective processing.
+                If provided, features are modulated by the mask at each scale.
+        
+        Returns:
+            torch.Tensor: Output logits of shape (batch_size, out_channels, height, width)
+        
+        Note:
+            - Skip connections preserve fine-grained details from encoder
+            - Mask can be used for attention mechanisms or region-specific processing
+            - Output resolution matches input resolution
+        """
+        # Initial processing
         x = self.bn1(x)
-        x1 = self.conv1(x)
+        x1 = self.conv1(x)  # 1x resolution, 64 channels
         if mask is not None:
             x1 = (x1 + 1) * mask
         # block1
