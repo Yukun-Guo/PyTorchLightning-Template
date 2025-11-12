@@ -27,6 +27,7 @@ A comprehensive template for building image segmentation models using PyTorch Li
 - [Examples](#examples)
 - [Contributing](#contributing)
 
+<a id="installation"></a>
 ## 🚀 Installation
 
 ### Prerequisites
@@ -73,6 +74,7 @@ python -c "import torch; import lightning; print(f'PyTorch: {torch.__version__},
 
 > **Note**: `uv` automatically handles PyTorch installation with CUDA support based on your system. The `uv.lock` file ensures reproducible builds across different environments.
 
+<a id="quick-start"></a>
 ## 🏃‍♂️ Quick Start
 
 ### 1. Prepare Your Data
@@ -135,6 +137,7 @@ Convert trained model to ONNX format for deployment:
 python ModelDeploy.py
 ```
 
+<a id="configuration"></a>
 ## ⚙️ Configuration
 
 The template uses a TOML configuration file (`config.toml`) for easy parameter management. Here are the key configuration sections:
@@ -169,6 +172,7 @@ early_stopping_patience = 7             # Early stopping patience
 early_stopping_monitor = "val_loss"     # Metric to monitor
 ```
 
+<a id="training"></a>
 ## 🎯 Training
 
 ### Basic Training
@@ -210,6 +214,7 @@ trainer = L.Trainer(
 - **Checkpoints**: Saved in `./logs/model_name/`
 - **Metrics**: Training/validation loss and IoU
 
+<a id="validation"></a>
 ## 📊 Validation
 
 ### Run Validation
@@ -239,6 +244,7 @@ The template includes various metrics:
 - **Pixel Accuracy**
 - **Mean Class Accuracy**
 
+<a id="model-deployment"></a>
 ## 🚀 Model Deployment
 
 ### Export to ONNX
@@ -267,6 +273,7 @@ input_data = np.random.rand(1, 1, 480, 288).astype(np.float32)
 output = session.run(None, {"input": input_data})
 ```
 
+<a id="project-structure"></a>
 ## 📁 Project Structure
 
 ```
@@ -315,6 +322,7 @@ PyTorchLightning-Template/
 └── deployed_model/            # Deployed models
 ```
 
+<a id="api-documentation"></a>
 ## 📚 API Documentation
 
 ### Core Classes
@@ -332,6 +340,7 @@ PyTorchLightning-Template/
 - **`save_onnxmodel()`**: Model export to ONNX format
 - **`find_best_checkpoint()`**: Automatic best checkpoint selection
 
+<a id="complete-documentation"></a>
 ## 📖 Complete Documentation
 
 This README provides a quick overview. For comprehensive documentation:
@@ -343,6 +352,7 @@ This README provides a quick overview. For comprehensive documentation:
 
 For detailed API documentation, see the [API Reference](docs/api.md).
 
+<a id="examples"></a>
 ## 💡 Examples
 
 ### Example 1: Medical Image Segmentation
