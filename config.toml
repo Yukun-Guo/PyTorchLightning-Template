@@ -1,0 +1,49 @@
+# Converted from config.ini to TOML
+
+[Version]
+version = "0.0.1"
+
+[DataModule]
+image_path = "./data/images"
+mask_path = "./data/masks"
+# Number of distinct label indices present in masks. Labels in `data/masks` range 0..11 so set to 12.
+n_class = 12
+image_shape = [480, 288, 1]
+batch_size = 16
+split_ratio = [0.6, 0.2, 0.2]
+use_kfold = false
+k_fold = 5
+k_fold_validation_ratio = 0.2
+augmentation = true
+shuffle = true
+
+[NetModule]
+model_name = "layer_segmentation"
+unet_channels = [64, 96, 128, 196]
+# Keep interpolation tokens as strings so existing code that performs replacement can still work
+input_shape = "${DataModule:image_shape}"
+out_channels = "${DataModule:n_class}"
+restore_model = false
+batch_size = "" # originally None in INI (TOML has no null)
+epochs = 500
+lr = 0.001
+checkpoint_dir = "./logs/checkpoints/"
+log_dir = "./logs/"
+early_stopping_patience = 7
+early_stopping_monitor = "val_loss"
+early_stopping_mode = "min"
+loss_weights = "" # originally None in INI
+weighted_metrics = "" # originally None in INI
+run_eagerly = false
+steps_per_execution = 1
+jit_compile = "auto"
+auto_scale_loss = true
+verbose = "auto"
+validation_split = 0.2
+class_weight = "" # originally None in INI
+sample_weight = "" # originally None in INI
+initial_epoch = 0
+steps_per_epoch = "" # originally None in INI
+validation_steps = "" # originally None in INI
+validation_batch_size = "" # originally None in INI
+validation_freq = 1

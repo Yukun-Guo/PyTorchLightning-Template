@@ -4,6 +4,7 @@ import PIL.Image as Image
 import glob
 import os
 from tqdm import tqdm
+import natsort
 
 def read_file_list(list_txt_file):
     fp = open(list_txt_file, 'r')
@@ -13,8 +14,7 @@ def read_file_list(list_txt_file):
 
 
 def listFiles(folder, file_filter="**/*", recursive=True):
-    return list(
-        glob.iglob(os.path.join(folder, file_filter), recursive=recursive))
+    return natsort.natsorted(list(glob.iglob(os.path.join(folder, file_filter), recursive=recursive)))
 
 
 def split_list(file_list, split=(0.8, 0.2, 0), shuffle=True):

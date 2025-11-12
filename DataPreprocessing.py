@@ -7,54 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-from Utils.utils import shuffle_lists, listFiles, k_fold_split, read_img_list_to_npy
+from Utils.utils import shuffle_lists, listFiles, read_img_list_to_npy
 from Utils.DataAugmentation import GrayJitter, RandomCrop2D, RandomFlip
-
-
-class myDataset_mat(Dataset):
-    """
-        Rewrite this class for your project
-    """
-
-    def __init__(self, mat_list, out_size, shuffle=True, img_tag='imgMat', msk_tag='imgMask'):
-        if shuffle:
-            mat_list = shuffle_lists(mat_list)
-            self.mat = shuffle_lists(
-                self._read_mat_list_to_npy(mat_list, img_tag, msk_tag))
-        else:
-            self.mat = self._read_mat_list_to_npy(mat_list, img_tag, msk_tag)
-        self.transform = transforms.Compose(
-            [GrayJitter(), RandomFlip(axis=1), RandomCrop2D(out_size), Normalize(), ToTensor()])
-
-    @staticmethod
-    def _read_mat_list_to_npy(file_list, img_tag, msk_tag):
-        npy_data = []
-        for f in tqdm(file_list, desc='Reading files'):
-            mat = sio.loadmat(f)
-            img, mask = np.array(mat[img_tag], dtype='float32'), np.array(
-                mat[msk_tag], dtype='int64')
-
-            npy_data.extend((img[:, :, i], mask[:, :, i])
-                            for i in range(img.shape[2]))
-        return npy_data
-
-    def __len__(self):
-        return len(self.mat)
-
-    def __getitem__(self, item):
-        if torch.is_tensor(item):
-            item = item.tolist()
-
-        img, mask = self.mat[item]
-        img = torch.from_numpy(np.expand_dims(img, 0))
-
-        # mask 1: retinal tissue and FV, 0: background
-        msk1 = torch.from_numpy(np.clip(mask, 0, 1)).type(torch.float32)
-        msk2 = torch.from_numpy(mask)
-        sample = {'img': img, 'mask1': msk1, 'mask2': msk2}
-
-        sample = self.transform(sample)
-        return sample['img'], (sample['mask1'], sample['mask2'])
 
 
 class myDataset_img(Dataset):
@@ -79,17 +33,12 @@ class myDataset_img(Dataset):
             item = item.tolist()
 
         img, mask = self.imgs[item], self.gts[item]
-
         img = np.expand_dims(img, 0)
 
-        # mask 1: retinal tissue and FV, 0: background
-        msk1 = np.clip(mask, 0, 1)
-        msk2 = mask
-        sample = {'img': img, 'mask1': msk1, 'mask2': msk2}
+        sample = {'img': img, 'mask': mask}
 
         sample = self.transform(sample)
-        return sample['img'], (sample['mask1'], sample['mask2'])
-
+        return sample['img'], sample['mask']
 
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
@@ -111,12 +60,9 @@ class Normalize(object):
         self.inplace = inplace
 
     def __call__(self, sample):
-        img, mask1, mask2 = sample['img'], sample['mask1'], sample['mask2']
-        # meanv = torch.mean(img)
-        # stdv = torch.std(img)
-        # img = F.normalize(img, meanv.numpy(), stdv.numpy(), self.inplace)
+        img, mask = sample['img'], sample['mask']
         img = img / 255.
-        return {'img': img, 'mask1': mask1, 'mask2': mask2}
+        return {'img': img, 'mask': mask}
 
     def __repr__(self):
         return self.__class__.__name__
@@ -134,16 +80,15 @@ class ToTensor(object):
     """
 
     def __call__(self, sample):
-        img, mask1, mask2 = sample['img'], sample['mask1'], sample['mask2']
+        img, mask = sample['img'], sample['mask']
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
         # img = torch.from_numpy(img)
-        if not torch.is_tensor(mask1):
-            mask1 = torch.from_numpy(mask1)
-            mask2 = torch.from_numpy(mask2)
+        if not torch.is_tensor(mask):
+            mask = torch.from_numpy(mask)
 
-        return {'img': img, 'mask1': mask1, 'mask2': mask2}
+        return {'img': img, 'mask': mask}
 
 
 if __name__ == '__main__':
@@ -157,13 +102,12 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     print(len(dataloader))
 
-    for img, (mask1, mask2) in dataloader:
+    for img, mask in dataloader:
         print(img[0].shape)
-        print(mask1[0].shape)
-        print(mask2[0].shape)
+        print(mask[0].shape)
         bscan = make_grid(torch.cat([img, img, img], dim=1)).permute(1, 2, 0)
         plt.figure()
         plt.subplot(1, 3, 1), plt.imshow(bscan.numpy())
-        plt.subplot(1, 3, 2), plt.imshow(np.squeeze(mask1[0].numpy()))
-        plt.subplot(1, 3, 3), plt.imshow(np.squeeze(mask2[0].numpy()))
+        plt.subplot(1, 3, 2), plt.imshow(np.squeeze(mask[0].numpy()))
+        plt.subplot(1, 3, 3), plt.imshow(np.squeeze(mask[0].numpy()))
         plt.show()

@@ -3,29 +3,20 @@ import lightning as L
 import torch
 from NetModule import NetModule
 from DataModule import DataModel
-from Network import CNNNet
-import numpy as np
-from Utils.utils import listFiles, split_list
-
+import toml
 # set device
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-
-
 print(torch.cuda.device_count())
 L.seed_everything(1234)
 
-img_list = listFiles("data/images", "*.png")
-gt_list = listFiles("data/groundtruth", "*.png")
+toml_file = "./config.toml"
+config = toml.load(toml_file)
 
-data_split_idx = split_list(list(range(len(img_list))), split=(0.7, 0.3))
+data_model = DataModel(config=config)
 
-net_model = NetModule(backbone_net=CNNNet, input_size=(384, 288))
-
-data_model = DataModel(
-    img_list, gt_list, data_split_idx=(data_split_idx[0], data_split_idx[1]), img_size=(384, 288), batch_size=8
-)
+net_model = NetModule(config=config)
 
 trainer = L.Trainer(
     logger=net_model.configure_loggers(),
@@ -33,8 +24,7 @@ trainer = L.Trainer(
     devices=[0],
     max_epochs=5000,
    # strategy="auto",  # strategy='ddp_sharded', # model parallelism,
-    log_every_n_steps=1,
+    log_every_n_steps=None,
 )
-
 
 trainer.fit(net_model, datamodule=data_model)

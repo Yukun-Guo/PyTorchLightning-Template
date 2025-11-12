@@ -5,126 +5,50 @@ from torchmetrics import functional as FM
 from lightning.pytorch.callbacks import early_stopping, model_checkpoint, lr_monitor
 from lightning.pytorch.loggers import TensorBoardLogger
 from Network import CNNNet
-from losses import dice, soft_bce
-from Utils.utils import apply_colormap
+from losses import dice
 from torchsummary import summary
-
+from Network import CNNNet
 
 class NetModule(L.LightningModule):
 
     def __init__(self,
-                 backbone_net,
-                 input_size=(384, 288),
-                 img_chn=1,
-                 log_dir='logs/',
-                 k_fold=0):
+                 config):
         super(NetModule, self).__init__()
 
         self.save_hyperparameters()
-        self.input_size = input_size
-        self.img_chn = img_chn
-        self.example_input_array = torch.randn((1, img_chn, *input_size))
-        self.out1 = backbone_net(in_channels=1,
-                                 out_channels=1,
-                                 out_activation=None)
-        self.out2 = backbone_net(in_channels=1,
-                                 out_channels=12,
-                                 out_activation=None)
-        self.model_name = backbone_net.__str__()
-        self.log_dir = log_dir
+        
+        self.input_size = config['DataModule']['image_shape'][:2]
+        self.img_chn = config['DataModule']['image_shape'][2]
+        self.n_class = config['DataModule']['n_class']
+        self.example_input_array = torch.randn((1, self.img_chn, *self.input_size))
+        self.out = CNNNet(in_channels=self.img_chn, out_channels=self.n_class,out_activation=None)
+
+        self.model_name = config['NetModule']["model_name"]
+        self.log_dir = config['NetModule']["log_dir"]
+        self.k_fold = config['DataModule']["k_fold"]
         self.valid_dataset = None
         self.train_dataset = None
-        self.k_fold = k_fold
-
+    
     def forward(self, x):
-        x1 = self.out1(x)
-        x2 = self.out2(x, x1)
-
-        return x1, x2
-
+        return self.out(x)
+    
     def training_step(self, batch, batch_idx):
-        x, (y1, y2) = batch
-        y_hat1, y_hat2 = self.forward(x)
-        y_hat1_s = torch.squeeze(torch.sigmoid(y_hat1), 1)
-        y_hat2_s = F.softmax(y_hat2, dim=1, _stacklevel=5)
-
-        loss1 = soft_bce.SoftBCEWithLogitsLoss()(
-            y_hat1_s, y1) + dice.DiceLoss(mode='binary')(y_hat1_s, y1)
-        loss2 = F.cross_entropy(y_hat2, y2) + \
-            dice.DiceLoss(mode='multiclass')(y_hat2_s, y2)
-
-        train_loss = (loss1 + loss2) / 2
-
-        iou1 = FM.jaccard_index(y_hat1_s, y1, task='binary')
-        iou2 = FM.jaccard_index(
-            y_hat2_s, y2, task='multiclass', num_classes=12)
-        train_iou = (iou1 + iou2) / 2
-
-        self.logger.experiment.add_scalars("losses",
-                                           {"train_loss": train_loss},
-                                           global_step=self.global_step)
-        self.logger.experiment.add_scalars("iou", {'train_iou': train_iou},
-                                           global_step=self.global_step)
+        x, y = batch
+        y_hat = self.forward(x)
+        y_hat_s = F.softmax(y_hat, dim=1, _stacklevel=5)
+        train_loss = F.cross_entropy(y_hat, y) + dice.DiceLoss(mode='multiclass')(y_hat_s, y)
+        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True)
 
         return {'loss': train_loss}
 
     def validation_step(self, batch, batch_idx):
-        x, (y1, y2) = batch
-        y_hat1, y_hat2 = self.forward(x)
-        y_hat1_s = torch.squeeze(torch.sigmoid(y_hat1), 1)
-        y_hat2_s = F.softmax(y_hat2, dim=1, _stacklevel=5)
+        x, y = batch
+        y_hat = self.forward(x)
+        y_hat_s = F.softmax(y_hat, dim=1, _stacklevel=5)
+        val_loss = F.cross_entropy(y_hat_s, y) + dice.DiceLoss(mode='multiclass')(y_hat_s, y)
+        val_iou = FM.jaccard_index(y_hat_s, y, task='multiclass', num_classes=self.n_class)
+        self.log_dict({'val_loss': val_loss, 'val_iou': val_iou},prog_bar=True, logger=True)
 
-        loss1 = soft_bce.SoftBCEWithLogitsLoss()(
-            y_hat1_s, y1) + dice.DiceLoss(mode='binary')(y_hat1_s, y1)
-        loss2 = F.cross_entropy(y_hat2, y2) + \
-            dice.DiceLoss(mode='multiclass')(y_hat2_s, y2)
-        val_loss = (loss1 + loss2) / 2
-
-        # acc1 = FM.accuracy(y_hat1_s, y1.type(torch.int64))
-        # acc2 = FM.accuracy(y_hat2_s, y2)
-        # val_acc = (acc1 + acc2) / 2
-
-        iou1 = FM.jaccard_index(y_hat1_s, y1, task='binary')
-        iou2 = FM.jaccard_index(
-            y_hat2_s, y2, task='multiclass', num_classes=12)
-        val_iou = (iou1 + iou2) / 2
-
-        self.logger.experiment.add_scalars("losses", {"val_loss": val_loss},
-                                           global_step=self.global_step)
-        self.logger.experiment.add_scalars('iou', {'val_iou': val_iou},
-                                           global_step=self.global_step)
-        self.log_dict({'val_loss': val_loss, 'val_iou': val_iou})
-        # log images
-
-        # x = resize_right.resize(x, scale_factors=0.5)
-        # y_hat1 = resize_right.resize(y_hat1, scale_factors=0.5)
-        # y_hat2 = resize_right.resize(y_hat2, scale_factors=0.5)
-        # y_hat1 = torch.argmax(y_hat1, 1, keepdim=False)
-        # y_hat2 = torch.argmax(y_hat2, 1, keepdim=False)
-        # y1_log = apply_colormap(y_hat1.cpu().numpy())
-        # y2_log = apply_colormap(y_hat2.cpu().numpy())
-
-        # y1_true = apply_colormap(np.ceil(y1.cpu().numpy()).astype('int64'))
-        # y2_true = apply_colormap(np.ceil(y2.cpu().numpy()).astype('int64'))
-
-        # self.logger.experiment.add_images("bscans", x, self.current_epoch)
-        # self.logger.experiment.add_images("pred1",
-        #                                   y1_log,
-        #                                   self.current_epoch,
-        #                                   dataformats='NHWC')
-        # self.logger.experiment.add_images("gt1",
-        #                                   y1_true,
-        #                                   self.current_epoch,
-        #                                   dataformats='NHWC')
-        # self.logger.experiment.add_images("pred2",
-        #                                   y2_log,
-        #                                   self.current_epoch,
-        #                                   dataformats='NHWC')
-        # self.logger.experiment.add_images("gt2",
-        #                                   y2_true,
-        #                                   self.current_epoch,
-        #                                   dataformats='NHWC')
-        # self.logger.experiment.flush()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=0.002)  # 0
@@ -166,7 +90,7 @@ class NetModule(L.LightningModule):
         device = torch.device('cpu')
         if torch.cuda.is_available():
             device = torch.device('cuda')
-        summary(self.to(device), (1, 384, 288))
+        summary(self.to(device), (1, 480, 288))
 
 
 if __name__ == '__main__':

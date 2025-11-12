@@ -21,7 +21,7 @@ class RandomCrop2D(object):
             constant fill.  default is 0.
         padding_mode (str, optional): Type of padding. Should be: constant,
             edge, reflect or symmetric. Default is constant.
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
 
     """
 
@@ -33,7 +33,7 @@ class RandomCrop2D(object):
         fill=0,
         padding_mode="constant",
     ):
-        assert isinstance(output_size, (int, tuple))
+        assert isinstance(output_size, (int, tuple, list))
         if isinstance(output_size, int):
             self.size = (output_size, output_size)
         else:
@@ -57,12 +57,10 @@ class RandomCrop2D(object):
         return i, j, th, tw
 
     def __call__(self, sample):
-        img, mask1, mask2 = sample["img"], sample["mask1"], sample["mask2"]
+        img, mask = sample["img"], sample["mask"]
         if self.padding is not None:
             img = np.pad(img, self.padding, self.fill, self.padding_mode)
-            mask1 = np.pad(mask1, self.padding, self.fill, self.padding_mode)
-            mask2 = np.pad(mask2, self.padding, self.fill, self.padding_mode)
-
+            mask = np.pad(mask, self.padding, self.fill, self.padding_mode)
         # pad the height if needed
         size = img.shape[-2:]  # [h, w, d]
         pad_h = (
@@ -90,20 +88,16 @@ class RandomCrop2D(object):
             constant_values=self.fill,
             mode=self.padding_mode,
         )
-        mask1 = np.pad(
-            mask1, (pad_h, pad_w), constant_values=self.fill, mode=self.padding_mode
+        mask = np.pad(
+            mask, (pad_h, pad_w), constant_values=self.fill, mode=self.padding_mode
         )
-        mask2 = np.pad(
-            mask2, (pad_h, pad_w), constant_values=self.fill, mode=self.padding_mode
-        )
-        i, j, h, w = self.get_params2d(img, self.size, mask1)
+        i, j, h, w = self.get_params2d(img, self.size)
 
         # crop the image
         img = img[:, i: i + h, j: j + w].copy()
-        mask1 = mask1[i: i + h, j: j + w].copy()
-        mask2 = mask2[i: i + h, j: j + w].copy()
+        mask = mask[i: i + h, j: j + w].copy()
 
-        return {"img": img, "mask1": mask1, "mask2": mask2}
+        return {"img": img, "mask": mask}
 
     def __repr__(self):
         return self.__class__.__name__ + "(size={0}, padding={1})".format(
@@ -131,7 +125,7 @@ class RandomCrop3D(object):
             constant fill.  default is 0.
         padding_mode (str, optional): Type of padding. Should be: constant,
             edge, reflect or symmetric. Default is constant.
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
 
     """
 
@@ -169,11 +163,10 @@ class RandomCrop3D(object):
         return i, j, k, th, tw, td
 
     def __call__(self, sample):
-        img, mask1, mask2 = sample["img"], sample["mask1"], sample["mask2"]
+        img, mask = sample["img"], sample["mask"]
         if self.padding is not None:
             img = np.pad(img, self.padding, self.fill, self.padding_mode)
-            mask1 = np.pad(mask1, self.padding, self.fill, self.padding_mode)
-            mask2 = np.pad(mask2, self.padding, self.fill, self.padding_mode)
+            mask = np.pad(mask, self.padding, self.fill, self.padding_mode)
 
         # pad the height if needed
         size = img.shape[-3:]  # [h, w, d]
@@ -227,10 +220,9 @@ class RandomCrop3D(object):
 
         # crop the image
         img = img[:, i: i + h, j: j + w, k: k + d].copy()
-        mask1 = mask1[i: i + h, j: j + w, k: k + d].copy()
-        mask2 = mask2[i: i + h, j: j + w, k: k + d].copy()
+        mask = mask[i: i + h, j: j + w, k: k + d].copy()
 
-        return {"img": img, "mask1": mask1, "mask2": mask2}
+        return {"img": img, "mask": mask}
 
     def __repr__(self):
         return self.__class__.__name__ + "(size={0}, padding={1})".format(
@@ -244,7 +236,7 @@ class GrayJitter(object):
         bright_range (tuple): range of brightness change.
         contrast_range (tuple): range of contrast change.
         max_value (int): max value of the image.
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
     """
 
     def __init__(self, bright_range=(0, 40), contrast_range=(0.5, 1.5), max_value=255):
@@ -253,7 +245,7 @@ class GrayJitter(object):
         self.max_value = max_value
 
     def __call__(self, sample):
-        img, mask1, mask2 = sample["img"], sample["mask1"], sample["mask2"]
+        img, mask = sample["img"], sample["mask"]
         bright_scale = np.random.uniform(
             self.bright_range[0], self.bright_range[1])
         contrast_scale = np.random.uniform(
@@ -263,7 +255,7 @@ class GrayJitter(object):
         img = (img - meanv) * contrast_scale + meanv
         img = img + bright_scale
         img = np.clip(img, 0, self.max_value)
-        return {"img": img, "mask1": mask1, "mask2": mask2}
+        return {"img": img, "mask": mask}
 
     def __repr__(self):
         return (
@@ -280,7 +272,7 @@ class AddGaussianNoise(object):
     Args:
         mean (float): mean of the Gaussian distribution.
         std (float): standard deviation of the Gaussian distribution.
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
     """
 
     def __init__(self, mean=0.0, std=5.0):
@@ -288,10 +280,10 @@ class AddGaussianNoise(object):
         self.mean = mean
 
     def __call__(self, sample):
-        img, msk1, msk2 = sample["img"], sample["mask1"], sample["mask2"]
+        img, mask = sample["img"], sample["mask"]
         img = np.clip(img + np.random.rand(*img.shape)
                       * self.std + self.mean, 0, 255)
-        return {"img": img, "mask1": msk1, "mask2": msk2}
+        return {"img": img, "mask": mask}
 
     def __repr__(self):
         return self.__class__.__name__ + "(mean={0}, std={1})".format(
@@ -304,19 +296,18 @@ class RandomRotate90n(object):
 
     Args:
         axes (tuple): axes to rotate. Default: (0, 1) for 2D, (1, 2) for 3D ?
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
     """
 
     def __init__(self, axes=0):
         self.axes = axes
 
     def __call__(self, sample):
-        image, mask1, mask2 = sample["img"], sample["mask1"], sample["mask2"]
+        image, mask = sample["img"], sample["mask"]
         degree = np.random.randint(0, 3)
         image = np.rot90(image, degree, axes=self.axes)
-        mask1 = np.rot90(mask1, degree, axes=self.axes)
-        mask2 = np.rot90(mask2, degree, axes=self.axes)
-        return {"img": image, "mask1": mask1, "mask2": mask2}
+        mask = np.rot90(mask, degree, axes=self.axes)
+        return {"img": image, "mask": mask}
 
 
 class RandomFlip(object):
@@ -325,7 +316,7 @@ class RandomFlip(object):
     Args:
         p (float): probability of the image being flipped. Default value is 0.5
         axis (int): axis to flip. 0 for vertical flip, 1 for horizontal flip. Default value is 0.
-        sample (dict): {'img': img, 'mask1': mask1, 'mask2': mask2}
+        sample (dict): {'img': img, 'mask': mask}
     """
 
     def __init__(self, p=0.5, axis=0):
@@ -333,17 +324,16 @@ class RandomFlip(object):
         self.axis = axis
 
     def __call__(self, sample):
-        image, mask1, mask2 = sample["img"], sample["mask1"], sample["mask2"]
+        image, mask = sample["img"], sample["mask"]
         if np.random.random() < self.p:
             image = np.flip(image, axis=self.axis+1)
-            mask1 = np.flip(mask1, axis=self.axis)
-            mask2 = np.flip(mask2, axis=self.axis)
-        return {"img": image, "mask1": mask1, "mask2": mask2}
+            mask = np.flip(mask, axis=self.axis)
+        return {"img": image, "mask": mask}
 
 
 if __name__ == "__main__":
     img = np.random.randint(0, 255, (1, 128, 128, 128))
     mask = np.random.randint(0, 255, (1, 128, 128, 128))
 
-    a = AddGaussianNoise()(sample={"img": img, "mask1": mask, "mask2": mask})
+    a = AddGaussianNoise()(sample={"img": img, "mask": mask})
     print(a["img"].shape)
