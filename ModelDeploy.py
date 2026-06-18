@@ -5,6 +5,7 @@ import numpy as np
 import os
 import glob
 from Utils.deploy_onnxmodel import save_onnxmodel, load_onnxmodel
+from Utils.check_CoreML_ops import analyse, print_terminal_report, write_markdown_report
 
 # load model from checkpoint
 # get the latest checkpoint in the logs folder
@@ -25,6 +26,7 @@ print("Test: onnx: ", np.equal(y[0].shape, np.array([1,11, 480, 288])))
 print("Checking inference correctness...")
 model = NetModule.load_from_checkpoint(checkpoint_path)
 model.eval()
+
 model.to('cpu')
 inp = torch.randn((1, 1, 480, 288), dtype=torch.float32)
 with torch.no_grad():
@@ -34,3 +36,9 @@ onnx_outs = ort_sess.run(None, {"input": inp.numpy()})
 onnx_out = onnx_outs[0]
 print("Max absolute difference between PyTorch and ONNX Runtime outputs: ", np.max(np.abs(pt_out_np - onnx_out)))
 print("Inference correctness check passed:", np.allclose(pt_out_np, onnx_out, atol=1e-5))
+
+
+# check CoreML compatibility
+result = analyse("./deployed_model/model.onnx","MLProgram")
+print_terminal_report(result, "./deployed_model/compatibility_report.md")
+write_markdown_report(result, "./deployed_model/compatibility_report.md")

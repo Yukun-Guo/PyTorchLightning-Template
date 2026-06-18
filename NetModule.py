@@ -11,10 +11,10 @@ import lightning as L
 from torchmetrics import functional as FM
 from lightning.pytorch.callbacks import early_stopping, model_checkpoint, lr_monitor
 from lightning.pytorch.loggers import TensorBoardLogger
-from Network import CNNNet
 from losses import dice
 from torchsummary import summary
 from typing import Dict, List, Any, Tuple
+import segmentation_models_pytorch as smp
 
 
 class NetModule(L.LightningModule):
@@ -80,10 +80,11 @@ class NetModule(L.LightningModule):
         self.img_chn = config['DataModule']['image_shape'][2]
         self.n_class = config['DataModule']['n_class']
         self.example_input_array = torch.randn((1, self.img_chn, *self.input_size))
-        self.out = CNNNet(
+        self.out = smp.Unet(
+            encoder_name="resnet34",
+            encoder_weights=None,
             in_channels=self.img_chn,
-            out_channels=self.n_class,
-            out_activation=None
+            classes=self.n_class,
         )
 
         self.model_name = config['NetModule']["model_name"]

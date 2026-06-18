@@ -11,8 +11,8 @@ class Conv2dReLU(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, padding=(0, 0), stride=(1, 1), use_batchnorm=True):
         conv = nn.Conv2d(in_channels, out_channels, kernel_size,
                          stride=stride, padding=padding, bias=not use_batchnorm)
-        relu = nn.ReLU(inplace=True)
         bn = nn.BatchNorm2d(out_channels) if use_batchnorm else nn.Identity()
+        relu = nn.ReLU(inplace=True)
         super(Conv2dReLU, self).__init__(conv, bn, relu)
 
 
@@ -22,8 +22,8 @@ class Conv3dReLU(nn.Sequential):
         conv = nn.Conv3d(in_channels, out_channels, kernel_size,
                          stride=stride, padding=padding, bias=not use_batchnorm)
 
-        relu = nn.ReLU(inplace=True)
         bn = nn.BatchNorm3d(out_channels) if use_batchnorm else nn.Identity()
+        relu = nn.ReLU(inplace=True)
         super(Conv3dReLU, self).__init__(conv, bn, relu)
 
 
