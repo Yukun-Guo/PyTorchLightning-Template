@@ -8,7 +8,7 @@ image_path = "./data/images"
 mask_path = "./data/masks"
 # Number of distinct label indices present in masks. Labels in `data/masks` range 0..11 so set to 12.
 n_class = 12
-image_shape = [480, 288, 1]
+image_shape = [1, 480, 288] # (C, H, W) format. C=1 for grayscale images. H and W are the height and width of the input images.
 batch_size = 16
 split_ratio = [0.6, 0.2, 0.2]
 use_kfold = false
