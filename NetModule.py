@@ -1,248 +1,168 @@
 """
-PyTorch Lightning Module for image segmentation models.
+PyTorch Lightning module for image segmentation.
 
-This module defines the neural network architecture, training logic, optimization,
-and callbacks for image segmentation tasks using PyTorch Lightning framework.
+Everything that defines *how the model learns* lives here:
+  - the network architecture        -> :meth:`NetModule.build_model`
+  - the loss function               -> :meth:`NetModule.compute_loss`
+  - the optimizer + LR scheduler    -> :meth:`NetModule.configure_optimizers`
+  - the train / val / test metrics  -> :meth:`NetModule._shared_step`
+
+All hyper-parameters are read from ``config.toml`` so, in most cases, adapting
+the template to your problem only requires editing that file. To use a custom
+network, replace the body of :meth:`build_model`.
 """
 
+from typing import Any, Dict, Tuple
+
+import lightning as L
 import torch
 import torch.nn.functional as F
-import lightning as L
 from torchmetrics import functional as FM
-from lightning.pytorch.callbacks import early_stopping, model_checkpoint, lr_monitor
-from lightning.pytorch.loggers import TensorBoardLogger
-from losses import dice
-from torchsummary import summary
-from typing import Dict, List, Any, Tuple
+
 import segmentation_models_pytorch as smp
+from losses import dice
 
 
 class NetModule(L.LightningModule):
-    """
-    Lightning Module for image segmentation training and inference.
-    
-    This class encapsulates the complete model definition including:
-    - Neural network architecture (CNNNet)
-    - Training and validation logic
-    - Loss function computation (CrossEntropy + Dice)
-    - Optimization configuration (Adam + ReduceLROnPlateau)
-    - Callbacks setup (EarlyStopping, ModelCheckpoint, LRMonitor)
-    - Logging configuration (TensorBoard)
-    
-    Args:
-        config (dict): Configuration dictionary containing model settings.
-            Required keys:
-            - DataModule.image_shape: Input image dimensions [H, W, C]
-            - DataModule.n_class: Number of segmentation classes
-            - NetModule.model_name: Model name for logging and checkpoints
-            - NetModule.log_dir: Directory for saving logs
-            - DataModule.k_fold: Number of folds for cross-validation
-    
-    Attributes:
-        input_size (tuple): Input image dimensions (height, width)
-        img_chn (int): Number of input channels
-        n_class (int): Number of output classes
-        example_input_array (torch.Tensor): Example input for model summary
-        out (CNNNet): The main network architecture
-        model_name (str): Model name for identification
-        log_dir (str): Directory for logging
-        k_fold (int): Number of folds for cross-validation
-    
-    Example:
-        >>> config = {
-        ...     'DataModule': {
-        ...         'image_shape': [256, 256, 1],
-        ...         'n_class': 4,
-        ...         'k_fold': 5
-        ...     },
-        ...     'NetModule': {
-        ...         'model_name': 'segmentation_model',
-        ...         'log_dir': './logs/'
-        ...     }
-        ... }
-        >>> model = NetModule(config)
-        >>> trainer = L.Trainer(max_epochs=100)
-        >>> trainer.fit(model, datamodule=data_module)
-    """
+    """LightningModule wrapping a segmentation network defined by ``config``."""
 
     def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize the NetModule with configuration parameters.
-        
-        Args:
-            config (dict): Configuration dictionary with model settings
-        """
-        super(NetModule, self).__init__()
-
+        super().__init__()
+        # Persist the full config so the model can be re-created from a checkpoint
+        # with ``NetModule.load_from_checkpoint(path)`` (no need to pass config again).
         self.save_hyperparameters()
-        
-        self.input_size = config['DataModule']['image_shape'][:2]
-        self.img_chn = config['DataModule']['image_shape'][2]
-        self.n_class = config['DataModule']['n_class']
-        self.example_input_array = torch.randn((1, self.img_chn, *self.input_size))
-        self.out = smp.Unet(
-            encoder_name="resnet34",
-            encoder_weights=None,
-            in_channels=self.img_chn,
+        self.config = config
+
+        data_cfg = config["DataModule"]
+        # image_shape is stored as (C, H, W)
+        self.in_channels = data_cfg["image_shape"][0]
+        self.input_size = tuple(data_cfg["image_shape"][1:])
+        self.n_class = data_cfg["n_class"]
+        self.example_input_array = torch.randn(1, self.in_channels, *self.input_size)
+
+        loss_cfg = config.get("Loss", {})
+        self.ce_weight = float(loss_cfg.get("ce_weight", 1.0))
+        self.dice_weight = float(loss_cfg.get("dice_weight", 1.0))
+
+        self.model = self.build_model(config)
+
+    # ------------------------------------------------------------------ #
+    # >>> EDIT HERE to change the network architecture. <<<
+    # Return any ``nn.Module`` mapping (B, C, H, W) -> (B, n_class, H, W).
+    # ------------------------------------------------------------------ #
+    def build_model(self, config: Dict[str, Any]) -> torch.nn.Module:
+        model_cfg = config["Model"]
+        encoder_weights = model_cfg.get("encoder_weights", "") or None
+        return smp.create_model(
+            arch=model_cfg.get("architecture", "Unet"),
+            encoder_name=model_cfg.get("encoder_name", "resnet34"),
+            encoder_weights=encoder_weights,
+            in_channels=self.in_channels,
             classes=self.n_class,
         )
 
-        self.model_name = config['NetModule']["model_name"]
-        self.log_dir = config['NetModule']["log_dir"]
-        self.k_fold = config['DataModule']["k_fold"]
-        self.valid_dataset = None
-        self.train_dataset = None
-    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass through the network.
-        
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width)
-        
-        Returns:
-            torch.Tensor: Output logits of shape (batch_size, n_classes, height, width)
-        """
-        return self.out(x)
-    
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> Dict[str, torch.Tensor]:
-        """
-        Training step for one batch.
-        
-        Computes the forward pass, calculates loss (CrossEntropy + Dice), and logs metrics.
-        
-        Args:
-            batch (tuple): Batch containing (images, masks) tensors
-            batch_idx (int): Index of the current batch
-        
-        Returns:
-            dict: Dictionary containing the computed loss
-        """
+        return self.model(x)
+
+    # ------------------------------------------------------------------ #
+    # >>> EDIT HERE to change the loss function. <<<
+    # ``logits`` are raw network outputs (B, n_class, H, W); ``y`` is (B, H, W).
+    # ------------------------------------------------------------------ #
+    def compute_loss(self, logits: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        ce_loss = F.cross_entropy(logits, y)
+        dice_loss = dice.DiceLoss(mode="multiclass", from_logits=True)(logits, y)
+        total = self.ce_weight * ce_loss + self.dice_weight * dice_loss
+        return total, ce_loss, dice_loss
+
+    def _shared_step(self, batch: Tuple[torch.Tensor, torch.Tensor], stage: str) -> torch.Tensor:
         x, y = batch
-        y_hat = self.forward(x)
-        y_hat_s = F.softmax(y_hat, dim=1, _stacklevel=5)
-        
-        # Combined loss: CrossEntropy + Dice
-        ce_loss = F.cross_entropy(y_hat, y)
-        dice_loss = dice.DiceLoss(mode='multiclass')(y_hat_s, y)
-        train_loss = ce_loss + dice_loss
-        
-        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_ce_loss", ce_loss, on_epoch=True, logger=True)
-        self.log("train_dice_loss", dice_loss, on_epoch=True, logger=True)
+        logits = self(x)
+        loss, ce_loss, dice_loss = self.compute_loss(logits, y)
 
-        return {'loss': train_loss}
+        probs = logits.softmax(dim=1)
+        iou = FM.jaccard_index(probs, y, task="multiclass", num_classes=self.n_class)
+        acc = FM.accuracy(probs, y, task="multiclass", num_classes=self.n_class)
 
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
-        """
-        Validation step for one batch.
-        
-        Computes forward pass, calculates validation metrics (loss and IoU),
-        and logs them for monitoring.
-        
-        Args:
-            batch (tuple): Batch containing (images, masks) tensors
-            batch_idx (int): Index of the current batch
-        """
-        x, y = batch
-        y_hat = self.forward(x)
-        y_hat_s = F.softmax(y_hat, dim=1, _stacklevel=5)
-        
-        # Validation loss
-        ce_loss = F.cross_entropy(y_hat_s, y)
-        dice_loss = dice.DiceLoss(mode='multiclass')(y_hat_s, y)
-        val_loss = ce_loss + dice_loss
-        
-        # Validation IoU
-        val_iou = FM.jaccard_index(y_hat_s, y, task='multiclass', num_classes=self.n_class)
-        
-        self.log_dict({
-            'val_loss': val_loss,
-            'val_iou': val_iou,
-            'val_ce_loss': ce_loss,
-            'val_dice_loss': dice_loss
-        }, prog_bar=True, logger=True)
-
-
-    def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
-        """
-        Configure optimizers and learning rate schedulers.
-        
-        Sets up Adam optimizer with ReduceLROnPlateau scheduler that reduces
-        learning rate when validation loss plateaus.
-        
-        Returns:
-            tuple: (optimizers, schedulers) - Lists containing optimizer and scheduler configs
-        """
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.002)
-        reduce_lr_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='min',
-            factor=0.1,
-            patience=3,
-            min_lr=1e-8
+        self.log(f"{stage}_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log_dict(
+            {
+                f"{stage}_ce_loss": ce_loss,
+                f"{stage}_dice_loss": dice_loss,
+                f"{stage}_iou": iou,
+                f"{stage}_acc": acc,
+            },
+            prog_bar=(stage == "val"),
+            on_step=False,
+            on_epoch=True,
         )
-        lr_scheduler = {
-            'scheduler': reduce_lr_on_plateau,
-            'monitor': 'val_loss',
-            'interval': 'epoch',
-            'reduce_on_plateau': True
-        }
-        return [optimizer], [lr_scheduler]
+        return loss
 
-    def configure_callbacks(self) -> List[L.Callback]:
-        """
-        Configure training callbacks.
-        
-        Sets up:
-        - EarlyStopping: Stops training when validation loss stops improving
-        - ModelCheckpoint: Saves best model based on validation loss
-        - LearningRateMonitor: Logs learning rate changes
-        
-        Returns:
-            list: List of configured callback instances
-        """
-        fd = str(self.k_fold)
-        early_stop = early_stopping.EarlyStopping(
-            monitor="val_loss",
-            min_delta=1e-08,
-            patience=10,
-            verbose=True
-        )
+    def training_step(self, batch, batch_idx) -> torch.Tensor:
+        return self._shared_step(batch, "train")
 
-        checkpoint = model_checkpoint.ModelCheckpoint(
-            dirpath=self.log_dir + self.model_name,
-            monitor="val_loss",
-            save_top_k=1,
-            verbose=True,
-            filename=f'{self.model_name}-fold={fd}-{{epoch:03d}}-{{val_loss:.5f}}'
-        )
+    def validation_step(self, batch, batch_idx) -> torch.Tensor:
+        return self._shared_step(batch, "val")
 
-        lr_monitors = lr_monitor.LearningRateMonitor(logging_interval='epoch')
-        return [early_stop, checkpoint, lr_monitors]
+    def test_step(self, batch, batch_idx) -> torch.Tensor:
+        return self._shared_step(batch, "test")
 
-    def configure_loggers(self) -> TensorBoardLogger:
-        """
-        Configure training loggers.
-        
-        Returns:
-            TensorBoardLogger: TensorBoard logger for monitoring training progress
-        """
-        return TensorBoardLogger(self.log_dir, name=self.model_name)
+    def predict_step(self, batch, batch_idx, dataloader_idx: int = 0) -> torch.Tensor:
+        x = batch[0] if isinstance(batch, (tuple, list)) else batch
+        return self(x).softmax(dim=1)
+
+    def configure_optimizers(self):
+        opt_cfg = self.config["Optimizer"]
+        name = opt_cfg.get("name", "AdamW").lower()
+        lr = float(opt_cfg.get("lr", 1e-3))
+        weight_decay = float(opt_cfg.get("weight_decay", 0.0))
+
+        if name == "sgd":
+            optimizer = torch.optim.SGD(
+                self.parameters(), lr=lr, weight_decay=weight_decay,
+                momentum=float(opt_cfg.get("momentum", 0.9)),
+            )
+        elif name == "adam":
+            optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
+        else:  # default: AdamW (decoupled weight decay, a strong modern default)
+            optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
+
+        scheduler_name = opt_cfg.get("scheduler", "none").lower()
+        monitor = self.config["Training"].get("monitor", "val_loss")
+
+        if scheduler_name == "reducelronplateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode=self.config["Training"].get("monitor_mode", "min"),
+                factor=float(opt_cfg.get("lr_factor", 0.5)),
+                patience=int(opt_cfg.get("lr_patience", 5)),
+                min_lr=float(opt_cfg.get("min_lr", 0.0)),
+            )
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {"scheduler": scheduler, "monitor": monitor, "interval": "epoch"},
+            }
+        if scheduler_name == "cosineannealinglr":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=int(self.config["Training"].get("max_epochs", 100)),
+                eta_min=float(opt_cfg.get("min_lr", 0.0)),
+            )
+            return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"}}
+
+        return optimizer
 
     def summary(self) -> None:
-        """
-        Print model architecture summary using torchsummary.
-        
-        Automatically detects available device (CUDA or CPU) and prints
-        detailed information about model layers, parameters, and memory usage.
-        """
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        summary(self.to(device), tuple(self.example_input_array.shape[1:]))
+        """Print a layer-by-layer summary of the network."""
+        try:
+            from torchinfo import summary as _summary
+
+            _summary(self.model, input_size=tuple(self.example_input_array.shape))
+        except ImportError:
+            print(self.model)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    from Utils.training import load_config
 
-    model = NetModule(CNNNet)
+    model = NetModule(load_config("config.toml"))
     model.summary()
-    model.to_onnx('test.onnx')

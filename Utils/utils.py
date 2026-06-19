@@ -435,16 +435,16 @@ def apply_colormap(im_gray):
 
 
 def find_best_row_col(n):
-    t = np.int(np.ceil(np.sqrt(n)))
+    t = int(np.ceil(np.sqrt(n)))
     rg = np.arange(1, t + 1)
     cols, rows = 1, t
     for i in rg[::-1]:
         if n % i == 0:
             rows = i
-            cols = np.int(n / rows)
+            cols = int(n / rows)
             break
     cols, rows = [rows, cols] if cols < rows else [cols, rows]
-    rows, cols = [np.int(np.ceil(n / t)), t
+    rows, cols = [int(np.ceil(n / t)), t
                   ] if rows == 1 or cols / rows > 3 else [rows, cols]
     return rows, cols
 

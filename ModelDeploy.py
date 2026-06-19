@@ -1,44 +1,70 @@
-from NetModule import NetModule
-import torch
-import onnxruntime as ort
+"""
+Export a trained checkpoint to ONNX and verify it.
+
+    python ModelDeploy.py
+
+Reads the ``[Deployment]`` config section, exports the (best) checkpoint to
+ONNX, runs the ONNX model with onnxruntime, compares its output against the
+PyTorch model, and writes a CoreML-compatibility report.
+"""
+
 import numpy as np
-import os
-import glob
-from Utils.deploy_onnxmodel import save_onnxmodel, load_onnxmodel
+import onnxruntime as ort
+import torch
+
+from NetModule import NetModule
 from Utils.check_CoreML_ops import analyse, print_terminal_report, write_markdown_report
-
-# load model from checkpoint
-# get the latest checkpoint in the logs folder
-logs_folder = "./logs/layer_segmentation"
-checkpoint_files = glob.glob(os.path.join(logs_folder, "*.ckpt"))
-checkpoint_files.sort(key=os.path.getmtime, reverse=True)  # Sort by modification time
-checkpoint_path = checkpoint_files[0] if checkpoint_files else None
-
-save_onnxmodel(checkpoint_path, out_path="./deployed_model",opset=18, input_shape=(1,1,480,288), enable_quantize=False, saved_model_filename="model.onnx")
-
-# decrypt model and test
-model_buffer = load_onnxmodel("./deployed_model/model.onnx")
-ort_sess = ort.InferenceSession(model_buffer)
-y = ort_sess.run(None, {"input": np.random.rand(1, 1, 480, 288).astype(np.float32)})
-print("Test: onnx: ", np.equal(y[0].shape, np.array([1,11, 480, 288])))
-
-# check inference correctness, compare with pytorch model
-print("Checking inference correctness...")
-model = NetModule.load_from_checkpoint(checkpoint_path)
-model.eval()
-
-model.to('cpu')
-inp = torch.randn((1, 1, 480, 288), dtype=torch.float32)
-with torch.no_grad():
-    pt_out = model(inp)
-pt_out_np = pt_out.cpu().numpy().astype(np.float32)
-onnx_outs = ort_sess.run(None, {"input": inp.numpy()})
-onnx_out = onnx_outs[0]
-print("Max absolute difference between PyTorch and ONNX Runtime outputs: ", np.max(np.abs(pt_out_np - onnx_out)))
-print("Inference correctness check passed:", np.allclose(pt_out_np, onnx_out, atol=1e-5))
+from Utils.deploy_onnxmodel import load_onnxmodel, save_onnxmodel
+from Utils.training import find_best_checkpoint, load_config
 
 
-# check CoreML compatibility
-result = analyse("./deployed_model/model.onnx","MLProgram")
-print_terminal_report(result, "./deployed_model/compatibility_report.md")
-write_markdown_report(result, "./deployed_model/compatibility_report.md")
+def main(config_path: str = "config.toml"):
+    config = load_config(config_path)
+    deploy = config["Deployment"]
+
+    checkpoint = deploy.get("checkpoint") or find_best_checkpoint(config)
+    if not checkpoint:
+        raise FileNotFoundError("No checkpoint found. Train a model first or set [Deployment].checkpoint.")
+    print(f"Exporting checkpoint: {checkpoint}")
+
+    c, h, w = config["DataModule"]["image_shape"]
+    n_class = config["DataModule"]["n_class"]
+    input_shape = (1, c, h, w)
+    out_dir = deploy["output_dir"]
+    onnx_name = deploy.get("onnx_filename", "model.onnx")
+    onnx_path = f"{out_dir}/{onnx_name}"
+
+    save_onnxmodel(
+        checkpoint,
+        out_path=out_dir,
+        opset=deploy.get("opset", 18),
+        input_shape=input_shape,
+        enable_quantize=deploy.get("quantize", False),
+        saved_model_filename=onnx_name,
+    )
+
+    # Sanity check the exported graph with onnxruntime.
+    ort_sess = ort.InferenceSession(load_onnxmodel(onnx_path))
+    dummy = np.random.rand(*input_shape).astype(np.float32)
+    y = ort_sess.run(None, {"input": dummy})
+    print("ONNX output shape:", y[0].shape, "(expected", (1, n_class, h, w), ")")
+
+    # Compare PyTorch vs ONNX outputs on the same input.
+    print("Checking inference correctness...")
+    model = NetModule.load_from_checkpoint(checkpoint).eval().to("cpu")
+    inp = torch.randn(input_shape, dtype=torch.float32)
+    with torch.no_grad():
+        pt_out = model(inp).cpu().numpy().astype(np.float32)
+    onnx_out = ort_sess.run(None, {"input": inp.numpy()})[0]
+    print("Max abs difference (PyTorch vs ONNX):", np.max(np.abs(pt_out - onnx_out)))
+    print("Outputs match:", np.allclose(pt_out, onnx_out, atol=1e-4))
+
+    # CoreML compatibility report.
+    report_path = f"{out_dir}/compatibility_report.md"
+    result = analyse(onnx_path, "MLProgram")
+    print_terminal_report(result, report_path)
+    write_markdown_report(result, report_path)
+
+
+if __name__ == "__main__":
+    main()

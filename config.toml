@@ -1,49 +1,90 @@
-# Converted from config.ini to TOML
+# =============================================================================
+# Training configuration — single source of truth for the whole pipeline.
+#
+# Edit the values below to adapt the template to your own dataset / model.
+# Each section maps to one component of the project:
+#   [Project]    -> run name + global seed
+#   [DataModule] -> DataModule.py / DataPreprocessing.py
+#   [Model]      -> NetModule.build_model (network architecture)
+#   [Loss]       -> NetModule.compute_loss
+#   [Optimizer]  -> NetModule.configure_optimizers
+#   [Training]   -> TrainerFit.py (Lightning Trainer + callbacks)
+#   [Logging]    -> TensorBoard logger + checkpoints
+#   [Deployment] -> ModelDeploy.py (ONNX export)
+# =============================================================================
 
-[Version]
-version = "0.0.1"
+[Project]
+name = "layer_segmentation"   # used for log / checkpoint folder names
+seed = 1234                   # global random seed for reproducibility
 
 [DataModule]
 image_path = "./data/images"
-mask_path = "./data/masks"
-# Number of distinct label indices present in masks. Labels in `data/masks` range 0..11 so set to 12.
-n_class = 12
-image_shape = [1, 480, 288] # (C, H, W) format. C=1 for grayscale images. H and W are the height and width of the input images.
+mask_path  = "./data/masks"
+# Image geometry in (C, H, W) order — the PyTorch tensor convention.
+#   C = number of input channels (1 = grayscale, 3 = RGB)
+#   H, W = height and width the images are cropped / resized to
+image_shape = [1, 480, 288]
+n_class = 12                  # number of segmentation classes (incl. background)
+
 batch_size = 16
-split_ratio = [0.6, 0.2, 0.2]
+num_workers = 4               # DataLoader workers (set 0 on Windows if you hit issues)
+split_ratio = [0.7, 0.15, 0.15]  # [train, val, test] — must sum to 1.0
+shuffle = true
+augmentation = true           # apply data augmentation to the TRAINING set only
+
+# K-fold cross validation (used only by TrainerFitKFold.py)
 use_kfold = false
 k_fold = 5
-k_fold_validation_ratio = 0.2
-augmentation = true
-shuffle = true
 
-[NetModule]
-model_name = "layer_segmentation"
-unet_channels = [64, 96, 128, 196]
-# Keep interpolation tokens as strings so existing code that performs replacement can still work
-input_shape = "${DataModule:image_shape}"
-out_channels = "${DataModule:n_class}"
-restore_model = false
-batch_size = "" # originally None in INI (TOML has no null)
-epochs = 500
-lr = 0.001
-checkpoint_dir = "./logs/checkpoints/"
-log_dir = "./logs/"
-early_stopping_patience = 7
-early_stopping_monitor = "val_loss"
-early_stopping_mode = "min"
-loss_weights = "" # originally None in INI
-weighted_metrics = "" # originally None in INI
-run_eagerly = false
-steps_per_execution = 1
-jit_compile = "auto"
-auto_scale_loss = true
-verbose = "auto"
-validation_split = 0.2
-class_weight = "" # originally None in INI
-sample_weight = "" # originally None in INI
-initial_epoch = 0
-steps_per_epoch = "" # originally None in INI
-validation_steps = "" # originally None in INI
-validation_batch_size = "" # originally None in INI
-validation_freq = 1
+[Model]
+# The network is built with segmentation-models-pytorch (smp).
+# Browse architectures / encoders at https://smp.readthedocs.io
+architecture    = "Unet"      # Unet, UnetPlusPlus, FPN, DeepLabV3Plus, ...
+encoder_name    = "resnet34"  # resnet18/34/50, efficientnet-b0, mit_b0, ...
+encoder_weights = ""          # "" = random init, "imagenet" = pretrained encoder
+restore_model   = false       # resume from the last checkpoint if one exists
+
+[Loss]
+# Total loss = ce_weight * CrossEntropy + dice_weight * Dice
+ce_weight   = 1.0
+dice_weight = 1.0
+
+[Optimizer]
+name         = "AdamW"        # Adam, AdamW or SGD
+lr           = 0.001
+weight_decay = 0.0001
+momentum     = 0.9            # used only when name = "SGD"
+# Learning-rate scheduler: "ReduceLROnPlateau" | "CosineAnnealingLR" | "none"
+scheduler    = "ReduceLROnPlateau"
+lr_factor    = 0.5            # ReduceLROnPlateau: lr <- lr * lr_factor on plateau
+lr_patience  = 5              # ReduceLROnPlateau: epochs to wait before reducing
+min_lr       = 1e-7
+
+[Training]
+max_epochs              = 500
+accelerator             = "auto"      # "auto" | "gpu" | "cpu" | "mps"
+devices                 = "auto"      # "auto" or e.g. [0] / [0, 1] for specific GPUs
+precision               = "32-true"   # "32-true" | "16-mixed" | "bf16-mixed" (mixed = faster on modern GPUs)
+gradient_clip_val       = 1.0         # 0 to disable gradient clipping
+accumulate_grad_batches = 1
+log_every_n_steps       = 10
+deterministic           = false       # true for fully reproducible (but slower) runs
+
+# Early stopping + the metric used to select the best checkpoint
+early_stopping           = true
+monitor                  = "val_loss" # metric to monitor (must be logged in NetModule)
+monitor_mode             = "min"      # "min" for losses, "max" for accuracy / IoU
+early_stopping_patience  = 15
+early_stopping_min_delta = 1e-4
+
+[Logging]
+log_dir   = "./logs"
+save_top_k = 1                # number of best checkpoints to keep
+save_last  = true             # also keep the most recent checkpoint (for resuming)
+
+[Deployment]
+checkpoint    = ""            # leave "" to auto-pick the best checkpoint
+output_dir    = "./deployed_model"
+onnx_filename = "model.onnx"
+opset         = 18
+quantize      = false

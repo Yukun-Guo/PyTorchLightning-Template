@@ -1,30 +1,39 @@
-import os
+"""
+Standard training entry point.
+
+    python TrainerFit.py
+
+Reads ``config.toml``, builds the data module, model, and a Lightning Trainer
+configured with best-practice callbacks (checkpointing, early stopping, LR
+monitoring), then trains and runs a final test pass on the held-out set.
+"""
+
 import lightning as L
-import torch
-from NetModule import NetModule
+
 from DataModule import DataModel
-import toml
-# set device
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+from NetModule import NetModule
+from Utils.training import build_trainer, last_checkpoint, load_config
 
-print(torch.cuda.device_count())
-L.seed_everything(1234)
 
-toml_file = "./config.toml"
-config = toml.load(toml_file)
+def main(config_path: str = "config.toml"):
+    config = load_config(config_path)
+    L.seed_everything(config["Project"]["seed"], workers=True)
 
-data_model = DataModel(config=config)
+    data_module = DataModel(config=config)
+    model = NetModule(config=config)
 
-net_model = NetModule(config=config)
+    trainer = build_trainer(config)
 
-trainer = L.Trainer(
-    logger=net_model.configure_loggers(),
-    accelerator="gpu",
-    devices=[0],
-    max_epochs=5000,
-   # strategy="auto",  # strategy='ddp_sharded', # model parallelism,
-    log_every_n_steps=None,
-)
+    # Optionally resume from the most recent checkpoint.
+    ckpt_path = last_checkpoint(config) if config["Model"].get("restore_model", False) else None
+    if ckpt_path:
+        print(f"Resuming from checkpoint: {ckpt_path}")
 
-trainer.fit(net_model, datamodule=data_model)
+    trainer.fit(model, datamodule=data_module, ckpt_path=ckpt_path)
+
+    # Evaluate the best checkpoint on the test split.
+    trainer.test(model, datamodule=data_module, ckpt_path="best")
+
+
+if __name__ == "__main__":
+    main()

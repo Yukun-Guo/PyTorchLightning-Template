@@ -34,15 +34,16 @@ def analyze_sample_prediction(predictions, ground_truths, sample_idx=0):
     """Analyze a specific sample prediction."""
     pred = predictions[sample_idx]
     gt = ground_truths[sample_idx]
-    
+
+    # Predictions are saved as class maps (H, W). Older runs may have saved
+    # probabilities (C, H, W) — collapse them to a class map if needed.
+    pred_classes = pred.argmax(axis=0) if pred.ndim == 3 else pred
+
     print(f"Sample {sample_idx}:")
     print(f"  Prediction shape: {pred.shape}")
     print(f"  Ground truth shape: {gt.shape}")
-    print(f"  Prediction classes range: {pred.argmax(axis=0).min()} - {pred.argmax(axis=0).max()}")
+    print(f"  Prediction classes range: {pred_classes.min()} - {pred_classes.max()}")
     print(f"  Ground truth classes range: {gt.min()} - {gt.max()}")
-    
-    # Convert prediction probabilities to class predictions
-    pred_classes = pred.argmax(axis=0)
     
     # Calculate per-sample metrics
     correct_pixels = (pred_classes == gt).sum()

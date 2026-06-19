@@ -1,144 +1,99 @@
 """
-Simplified K-Fold Cross Validation Training Script
+K-fold cross-validation training entry point.
 
-This script performs k-fold cross validation training using the project's
-Lightning model and data pipeline.
+    python TrainerFitKFold.py
+
+Splits the dataset into ``k_fold`` folds and trains one model per fold. Each
+fold gets its own logger version and checkpoint filenames (``...-foldN-...``).
+Reuses the same config and best-practice Trainer as :mod:`TrainerFit`.
 """
 
-import toml
 import lightning as L
 from torch.utils.data import DataLoader
-from DataPreprocessing import myDataset_img
+
+from DataPreprocessing import SegmentationDataset
 from NetModule import NetModule
+from Utils.training import build_trainer, load_config
 from Utils.utils import k_fold_split, listFiles
 
 
 class KFoldDataModule(L.LightningDataModule):
-    """Simple DataModule for K-fold training with explicit train/val splits."""
-    
-    def __init__(self, train_img_list, train_gt_list, val_img_list, val_gt_list, 
-                 img_size, batch_size, shuffle=True):
+    """DataModule for a single fold with explicit train/val file lists."""
+
+    def __init__(self, train_files, val_files, img_size, channels, batch_size,
+                 num_workers, shuffle, augmentation):
         super().__init__()
-        self.train_img_list = train_img_list
-        self.train_gt_list = train_gt_list
-        self.val_img_list = val_img_list
-        self.val_gt_list = val_gt_list
+        self.train_imgs, self.train_gts = train_files
+        self.val_imgs, self.val_gts = val_files
         self.img_size = img_size
+        self.channels = channels
         self.batch_size = batch_size
+        self.num_workers = num_workers
         self.shuffle = shuffle
+        self.augmentation = augmentation
 
     def setup(self, stage=None):
-        self.train_dataset = myDataset_img(
-            self.train_img_list, self.train_gt_list, self.img_size
+        self.train_dataset = SegmentationDataset(
+            self.train_imgs, self.train_gts, self.img_size, channels=self.channels,
+            train=True, augmentation=self.augmentation,
         )
-        self.val_dataset = myDataset_img(
-            self.val_img_list, self.val_gt_list, self.img_size
+        self.val_dataset = SegmentationDataset(
+            self.val_imgs, self.val_gts, self.img_size, channels=self.channels,
+            train=False, augmentation=False,
+        )
+
+    def _loader(self, dataset, shuffle):
+        return DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=shuffle,
+            num_workers=self.num_workers, pin_memory=True,
+            persistent_workers=self.num_workers > 0, drop_last=shuffle,
         )
 
     def train_dataloader(self):
-        return DataLoader(
-            self.train_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=self.shuffle
-        )
+        return self._loader(self.train_dataset, self.shuffle)
 
     def val_dataloader(self):
-        return DataLoader(
-            self.val_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=False
-        )
+        return self._loader(self.val_dataset, False)
 
 
-def run_kfold_training():
-    """Main function to run k-fold cross validation training."""
-    # Set random seed
-    L.seed_everything(1234)
-    
-    # Load configuration
-    with open('config.toml', 'r') as f:
-        config = toml.load(f)
-    
-    # Get configuration parameters
-    data_config = config['DataModule']
-    net_config = config['NetModule']
-    
-    # Load image and mask files
-    img_list = listFiles(data_config['image_path'], "*.png")
-    gt_list = listFiles(data_config['mask_path'], "*.png")
-    
-    if not img_list or not gt_list:
-        raise ValueError("No images or masks found in specified directories")
-    
-    if len(img_list) != len(gt_list):
-        raise ValueError("Number of images and masks must be equal")
-    
-    # K-fold parameters
-    k_folds = data_config.get('k_fold', 5)
-    img_size = tuple(data_config['image_shape'][:2])  # (H, W)
-    batch_size = data_config['batch_size']
-    
-    # Generate k-fold splits
-    _, kfold_indices = k_fold_split(img_list, fold=k_folds)
-    
-    print(f"Starting {k_folds}-fold cross validation")
-    print(f"Total samples: {len(img_list)}")
-    print(f"Image size: {img_size}")
-    print(f"Batch size: {batch_size}")
-    print("-" * 50)
-    
-    # Train each fold
-    for fold_idx, (train_indices, val_indices) in enumerate(kfold_indices):
-        print(f"Training Fold {fold_idx + 1}/{k_folds}")
-        print(f"Train samples: {len(train_indices)}, Val samples: {len(val_indices)}")
-        
-        # Create file lists for this fold
-        train_img_list = [img_list[i] for i in train_indices]
-        train_gt_list = [gt_list[i] for i in train_indices]
-        val_img_list = [img_list[i] for i in val_indices]
-        val_gt_list = [gt_list[i] for i in val_indices]
-        
-        # Create data module for this fold
+def main(config_path: str = "config.toml"):
+    config = load_config(config_path)
+    L.seed_everything(config["Project"]["seed"], workers=True)
+
+    data_cfg = config["DataModule"]
+    img_list = listFiles(data_cfg["image_path"], "*.png")
+    gt_list = listFiles(data_cfg["mask_path"], "*.png")
+    if not img_list or len(img_list) != len(gt_list):
+        raise ValueError("Images and masks must exist and have equal counts.")
+
+    k_folds = data_cfg.get("k_fold", 5)
+    channels = data_cfg["image_shape"][0]
+    img_size = tuple(data_cfg["image_shape"][1:])
+
+    _, fold_indices = k_fold_split(list(range(len(img_list))), fold=k_folds)
+
+    print(f"Starting {k_folds}-fold cross validation on {len(img_list)} samples.")
+    for fold, (train_idx, val_idx) in enumerate(fold_indices, start=1):
+        print(f"\n===== Fold {fold}/{k_folds} "
+              f"(train={len(train_idx)}, val={len(val_idx)}) =====")
+
         datamodule = KFoldDataModule(
-            train_img_list=train_img_list,
-            train_gt_list=train_gt_list,
-            val_img_list=val_img_list,
-            val_gt_list=val_gt_list,
+            train_files=([img_list[i] for i in train_idx], [gt_list[i] for i in train_idx]),
+            val_files=([img_list[i] for i in val_idx], [gt_list[i] for i in val_idx]),
             img_size=img_size,
-            batch_size=batch_size,
-            shuffle=data_config.get('shuffle', True)
+            channels=channels,
+            batch_size=data_cfg["batch_size"],
+            num_workers=data_cfg.get("num_workers", 4),
+            shuffle=data_cfg.get("shuffle", True),
+            augmentation=data_cfg.get("augmentation", True),
         )
-        
-        # Update config with current fold info
-        fold_config = config.copy()
-        fold_config['DataModule']['k_fold'] = fold_idx + 1
-        
-        # Create model
-        model = NetModule(config=fold_config)
-        
-        # Create trainer
-        import torch
-        use_gpu = torch.cuda.is_available()
-        
-        trainer = L.Trainer(
-            logger=model.configure_loggers(),
-            callbacks=model.configure_callbacks(),
-            devices=1 if use_gpu else 0,
-            accelerator='gpu' if use_gpu else 'cpu',
-            max_epochs=net_config.get('epochs', 500),
-            log_every_n_steps=1,
-            enable_progress_bar=True
-        )
-        
-        # Train the model
+
+        model = NetModule(config=config)
+        trainer = build_trainer(config, fold=fold)
         trainer.fit(model, datamodule=datamodule)
-        
-        print(f"Fold {fold_idx + 1} completed")
-        print("-" * 50)
-    
-    print("K-fold cross validation completed!")
+
+    print("\nK-fold cross validation completed.")
 
 
 if __name__ == "__main__":
-    run_kfold_training()
-
+    main()
