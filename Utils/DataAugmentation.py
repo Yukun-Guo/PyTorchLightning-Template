@@ -30,8 +30,6 @@ class RandomExtractSlice3D(object):
         mask = mask[:, :, z + self.output_channel // 2]
         return {"img": img, "mask": mask}
 
-        return {"img": img, "mask": mask}
-
     def __repr__(self):
         return self.__class__.__name__ + "(output_channel={0})".format(
             self.output_channel
